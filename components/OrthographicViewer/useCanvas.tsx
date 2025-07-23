@@ -22,7 +22,8 @@ export default function useCanvas(
   measureData: { XY: MeasureData; XZ: MeasureData; YZ: MeasureData },
   setLoading: (loading: boolean) => void,
   setErrorMessage: (message: string | null) => void,
-  setCoords: (coords: { x: number; y: number; z: number }) => void
+  setCoords: (coords: { x: number; y: number; z: number }) => void,
+  brightfieldBlobUrl: string
 ) {
   const bgColor = theme === "dark" ? "#171717" : "#fafafa";
 
@@ -62,22 +63,30 @@ export default function useCanvas(
   } | null>(null);
 
   const loadImageSet = useCallback(async (folder: string, count: number) => {
-    const images = [];
-    for (let i = 0; i < count; i++) {
-      const img = new Image();
-      img.src = `model2_1png/${folder}/${i.toString().padStart(3, "0")}.png`;
-      await new Promise((res) => (img.onload = res));
-      images[i] = img;
+    const promises: Promise<HTMLImageElement>[] = Array.from({ length: count }, (_, i) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous"; // Allow CORS for external URLs
+        img.src = `${brightfieldBlobUrl}/${folder}/${i.toString().padStart(3, "0")}.png`;
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load image ${i}`));
+      });
+    });
+
+    try {
+      const images = await Promise.all(promises);
+      return images;
+    } catch (error) {
+      throw new Error(`Error loading image set ${folder}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    return images;
-  }, []);
+  }, [brightfieldBlobUrl]);
 
   const preloadImages = useCallback(async () => {
     setLoading(true);
     try {
       const [xy, xz, yz] = await Promise.all([
-        loadImageSet("xy", NUM_Z),
-        loadImageSet("xz", NUM_Y),
+        loadImageSet("xy", NUM_Z), // Assuming 'brightfield' folder structure
+        loadImageSet("xz", NUM_Y), // Adjust folder names if different
         loadImageSet("yz", NUM_X),
       ]);
       slicesXY.current = xy;
@@ -98,11 +107,11 @@ export default function useCanvas(
       });
     } catch (error) {
       console.error("Error loading images:", error);
-      setErrorMessage("Failed to load images. Please try again.");
+      setErrorMessage(`Failed to load images: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setErrorMessage, setCoords]);
+  }, [setLoading, setErrorMessage, setCoords, brightfieldBlobUrl]);
 
   const drawCrosshair = useCallback(
     (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {
@@ -196,8 +205,6 @@ export default function useCanvas(
         dimensions[view.toLowerCase() as keyof typeof dimensions].height - 1
       );
 
-      console.log(`Click on ${view}: mx=${mx}, my=${my}`);
-
       let newCoords = { ...coords };
       if (view === "XY") {
         newCoords = {
@@ -219,7 +226,6 @@ export default function useCanvas(
         };
       }
 
-      console.log("New coords:", newCoords);
       setCoords(newCoords);
     },
     [coords, zoomXY, zoomXZ, zoomYZ, dimensions, setCoords]

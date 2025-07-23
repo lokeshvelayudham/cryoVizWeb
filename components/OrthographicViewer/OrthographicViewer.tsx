@@ -7,14 +7,26 @@ import MeasureToggleButton from "./MeasureTool";
 import LoadingOverlay from "./LoadingOverlay";
 import AnnotationPanel from "./Annotation/AnnotationPanel";
 import AnnotationTextBox from "./Annotation/AnnotationTextBox";
+import AnnotationModal from "./Annotation/AnnotationModal";
+import ViewControlPanel from "./ViewControlPanel";
 import useAnnotations from "./Annotation/useAnnotations";
 import useCanvas from "./useCanvas";
+import useMeasurements from "./useMeasurements";
+
+import MediaControlPanel from "./MediaControlPanel";
+
 
 const NUM_Z = 165; // slicesXY (Z-axis slices)
 const NUM_Y = 416; // slicesXZ (Y-axis slices)
 const NUM_X = 1118; // slicesYZ (X-axis slices)
 
-export default function OrthographicViewer() {
+type Point = { x: number; y: number };
+type MeasureData = {
+  points: Point[];
+  lines: { p1: Point; p2: Point; dist: number }[];
+};
+
+export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: { brightfieldBlobUrl: string; datasetName: string }) {  
   const { theme } = useTheme();
   const { data: session, status } = useSession();
   const userEmail = session?.user?.email || null;
@@ -27,13 +39,7 @@ export default function OrthographicViewer() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-
-  type Point = { x: number; y: number };
-  type MeasureData = {
-    points: Point[];
-    lines: { p1: Point; p2: Point; dist: number }[];
-  };
-
+  const [isMeasuring, setIsMeasuring] = useState(false);
   const [measureData, setMeasureData] = useState<{
     XY: MeasureData;
     XZ: MeasureData;
@@ -44,8 +50,6 @@ export default function OrthographicViewer() {
     YZ: { points: [], lines: [] },
   });
 
-  const micronsPerPixel = 0.5;
-  const [isMeasuring, setIsMeasuring] = useState(false);
   const [activePixelColor, setActivePixelColor] = useState<{
     view: "XY" | "XZ" | "YZ";
     color: string;
@@ -70,7 +74,7 @@ export default function OrthographicViewer() {
     handleSaveEdit,
   } = useAnnotations(userEmail, setErrorMessage);
 
-  // Use the canvas hook, including setters for pan and zoom
+  // Use the canvas hook
   const {
     canvasXY,
     canvasXZ,
@@ -98,7 +102,21 @@ export default function OrthographicViewer() {
     preloadImages,
     drawAll,
     activePixelColor: canvasActivePixelColor,
-  } = useCanvas(theme, coords, measureData, setLoading, setErrorMessage, setCoords);
+  } = useCanvas(theme, coords, measureData, setLoading, setErrorMessage, setCoords, brightfieldBlobUrl);
+
+  // Use the measurements hook
+  const {
+    micronsPerPixel,
+    handleMeasureClick,
+    handleToggleMeasure,
+  } = useMeasurements(
+    { XY: canvasXY as React.RefObject<HTMLCanvasElement>, XZ: canvasXZ as React.RefObject<HTMLCanvasElement>, YZ: canvasYZ as React.RefObject<HTMLCanvasElement> },
+    { XY: panXY, XZ: panXZ, YZ: panYZ },
+    { XY: zoomXY, XZ: zoomXZ, YZ: zoomYZ },
+    drawAll,
+    measureData,
+    setMeasureData
+  );
 
   // Sync activePixelColor from useCanvas
   useEffect(() => {
@@ -150,56 +168,11 @@ export default function OrthographicViewer() {
       instance: 0,
       datetime: Date.now(),
       user: userEmail,
+      dataset: "Brain",
+      status: "active",
     };
 
     setAnnotations((prev) => [...prev, newAnnotation]);
-  };
-
-  const handleMeasureClick = (
-    e: React.MouseEvent<HTMLCanvasElement>,
-    view: "XY" | "XZ" | "YZ"
-  ) => {
-    if (!isMeasuring) return;
-
-    const canvas = { XY: canvasXY, XZ: canvasXZ, YZ: canvasYZ }[view].current!;
-    const rect = canvas.getBoundingClientRect();
-    const pan = { XY: panXY, XZ: panXZ, YZ: panYZ }[view];
-    const zoom = { XY: zoomXY, XZ: zoomXZ, YZ: zoomYZ }[view];
-
-    const x = (e.clientX - rect.left - pan.x) / zoom;
-    const y = (e.clientY - rect.top - pan.y) / zoom;
-    const newPoint = { x, y };
-
-    setMeasureData((prev) => {
-      const viewData = prev[view];
-      const updatedPoints = [...viewData.points, newPoint];
-
-      if (updatedPoints.length % 2 === 0) {
-        const p1 = updatedPoints[updatedPoints.length - 2];
-        const p2 = newPoint;
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) * micronsPerPixel;
-
-        return {
-          ...prev,
-          [view]: {
-            points: updatedPoints,
-            lines: [...viewData.lines, { p1, p2, dist }],
-          },
-        };
-      }
-
-      return {
-        ...prev,
-        [view]: {
-          ...viewData,
-          points: updatedPoints,
-        },
-      };
-    });
-
-    drawAll();
   };
 
   const handleCanvasClick = (
@@ -215,23 +188,6 @@ export default function OrthographicViewer() {
     }
   };
 
-  const handleToggleMeasure = () => {
-    setIsMeasuring((prev) => {
-      const newVal = !prev;
-      if (!newVal) {
-        setMeasureData({
-          XY: { points: [], lines: [] },
-          XZ: { points: [], lines: [] },
-          YZ: { points: [], lines: [] },
-        });
-        setTimeout(() => {
-          drawAll();
-        }, 0);
-      }
-      return newVal;
-    });
-  };
-
   const handleSlider = (axis: "x" | "y" | "z", value: number) => {
     setCoords((prev) => ({ ...prev, [axis]: value }));
   };
@@ -242,13 +198,32 @@ export default function OrthographicViewer() {
       y: Math.floor(NUM_Y / 2),
       z: Math.floor(NUM_Z / 2),
     });
-    // Reset pan and zoom via the canvas hook
     setPanXY({ x: 0, y: 0 });
     setPanXZ({ x: 0, y: 0 });
     setPanYZ({ x: 0, y: 0 });
     setZoomXY(1);
     setZoomXZ(1);
     setZoomYZ(1);
+  };
+
+  const handleToggleMeasureWrapper = () => {
+    setIsMeasuring((prev) => {
+      const newVal = !prev;
+      handleToggleMeasure(newVal);
+      return newVal;
+    });
+  };
+
+  const setZoom = (zoom: { XY: number; XZ: number; YZ: number }) => {
+    setZoomXY(zoom.XY);
+    setZoomXZ(zoom.XZ);
+    setZoomYZ(zoom.YZ);
+  };
+
+  const setPan = (pan: { XY: { x: number; y: number }; XZ: { x: number; y: number }; YZ: { x: number; y: number } }) => {
+    setPanXY(pan.XY);
+    setPanXZ(pan.XZ);
+    setPanYZ(pan.YZ);
   };
 
   useEffect(() => {
@@ -276,105 +251,17 @@ export default function OrthographicViewer() {
         </div>
       )}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000]">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-4xl max-h-[80vh] overflow-auto">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-              Annotations
-            </h2>
-            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-              <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-400">
-                <tr>
-                  <th className="px-4 py-2">Text</th>
-                  <th className="px-4 py-2">Plane</th>
-                  <th className="px-4 py-2">Slice</th>
-                  <th className="px-4 py-2">Instance</th>
-                  <th className="px-4 py-2">Date</th>
-                  <th className="px-4 py-2">User</th>
-                  <th className="px-4 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {annotations.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-2 text-center">
-                      No annotations found
-                    </td>
-                  </tr>
-                ) : (
-                  annotations.map((ann) => (
-                    <tr key={ann._id || ann.id} className="border-b dark:border-gray-700">
-                      <td className="px-4 py-2">
-                        {editingAnnotationId === (ann._id || ann.id) ? (
-                          <input
-                            type="text"
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            className="border rounded px-2 py-1 w-full dark:bg-gray-700 dark:text-gray-100"
-                          />
-                        ) : (
-                          ann.text || "N/A"
-                        )}
-                      </td>
-                      <td className="px-4 py-2">{ann.view}</td>
-                      <td className="px-4 py-2">{ann.slice}</td>
-                      <td className="px-4 py-2">{ann.instance}</td>
-                      <td className="px-4 py-2">
-                        {new Date(ann.datetime).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </td>
-                      <td className="px-4 py-2">{ann.user || "Unknown"}</td>
-                      <td className="px-4 py-2 flex space-x-2">
-                        {editingAnnotationId === (ann._id || ann.id) ? (
-                          <>
-                            <button
-                              onClick={() => handleSaveEdit(ann._id || ann.id)}
-                              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-600"
-                              title="Save annotation"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingAnnotationId(null)}
-                              className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-600"
-                              title="Cancel editing"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => handleEditAnnotation(ann._id || ann.id, ann.text)}
-                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600"
-                            title="Edit annotation"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        <button
-                          onClick={() => deleteAnnotationFromMongoDB(ann._id || ann.id)}
-                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600"
-                          title="Delete annotation"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <button
-              onClick={() => setShowModal(false)}
-              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700"
-              title="Close modal"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <AnnotationModal
+          annotations={annotations}
+          editingAnnotationId={editingAnnotationId}
+          editingText={editingText}
+          setEditingAnnotationId={setEditingAnnotationId}
+          setEditingText={setEditingText}
+          handleEditAnnotation={handleEditAnnotation}
+          handleSaveEdit={handleSaveEdit}
+          deleteAnnotationFromMongoDB={deleteAnnotationFromMongoDB}
+          onClose={() => setShowModal(false)}
+        />
       )}
       <div className="flex flex-col h-[90%]">
         <div className="flex-1 flex justify-center relative">
@@ -545,7 +432,7 @@ export default function OrthographicViewer() {
       />
       <MeasureToggleButton
         isMeasuring={isMeasuring}
-        onToggle={handleToggleMeasure}
+        onToggle={handleToggleMeasureWrapper}
       />
       <XYZControls
         coords={coords}
@@ -553,6 +440,21 @@ export default function OrthographicViewer() {
         limits={{ x: NUM_X - 1, y: NUM_Y - 1, z: NUM_Z - 1 }}
         onReset={handleReset}
       />
+      <ViewControlPanel
+        coords={coords}
+        zoom={{ XY: zoomXY, XZ: zoomXZ, YZ: zoomYZ }}
+        pan={{ XY: panXY, XZ: panXZ, YZ: panYZ }}
+        setCoords={setCoords}
+        setZoom={setZoom}
+        setPan={setPan}
+        canvasXY={canvasXY as React.RefObject<HTMLCanvasElement>}
+        canvasXZ={canvasXZ as React.RefObject<HTMLCanvasElement>}
+        canvasYZ={canvasYZ as React.RefObject<HTMLCanvasElement>}
+        setErrorMessage={setErrorMessage}
+      />
+
+      {/* Media Control Panel */}
+      <MediaControlPanel dataset="Brain" setErrorMessage={setErrorMessage} />
       {isMeasuring && (
         <p className="absolute bottom-20 left-20 text-white bg-black/60 px-2 py-1 rounded text-sm">
           Click twice in any plane (XY, XZ, YZ) to display a measurement in µm.

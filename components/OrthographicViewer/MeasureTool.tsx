@@ -19,10 +19,12 @@ const MeasureToggleButton: React.FC<MeasureToggleButtonProps> = ({
     <div style={{ position: "absolute", bottom: 60, left: 10, zIndex: 10 }}>
       <button
         onClick={() => setShowPanel((prev) => !prev)}
-        className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white transition-colors"
+        className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 dark:hover:bg-red-400 dark:hover:text-white hover:text-white transition-colors group"
         title="Toggle Measurement Panel"
       >
-        <Ruler size={20} />
+        <div className="relative">
+          <Ruler size={20} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
+        </div>
       </button>
       {showPanel && (
         <Card

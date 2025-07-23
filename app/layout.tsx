@@ -1,5 +1,7 @@
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
+import ReactQueryProvider from "@/components/providers/ReactQueryProvider";
+
 
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <ReactQueryProvider>
+            {children}
+          </ReactQueryProvider>
         </ThemeProvider>
       </body>
     </html>

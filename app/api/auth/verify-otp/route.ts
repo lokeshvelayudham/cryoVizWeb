@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { encode } from "next-auth/jwt";
 import clientPromise from "@/lib/mongodb";
+import { updateUserLastLogin } from "@/lib/models";
 
 export async function POST(req: Request) {
   const { email, otp } = await req.json();
@@ -18,6 +19,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+    // Update logins and lastLogin
+    await updateUserLastLogin(user._id.toString());
+
   // Clean up OTP
   await db.collection("otps").deleteMany({ email });
 
@@ -27,6 +31,7 @@ export async function POST(req: Request) {
       name: user.name || user.email,
       email: user.email,
       sub: user._id.toString(),
+      accessLevel: user.accessLevel,
     },
     secret: process.env.NEXTAUTH_SECRET!,
   });

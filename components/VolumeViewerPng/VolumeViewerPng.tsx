@@ -18,7 +18,7 @@ import ViewControls from "./ViewControls";
 import OpacitySlider from "./OpacitySlider";
 import ShaderSelector from "./ShaderSelector";
 
-const VolumeViewerPng: React.FC = () => {
+const VolumeViewerPng: React.FC<{ brightfieldBlobUrl: string; datasetName: string }> = ({ brightfieldBlobUrl, datasetName }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [clip, setClip] = useState({ x: 0, y: 0, z: 0 });
   const [quality, setQuality] = useState(1.5);
@@ -55,7 +55,7 @@ const VolumeViewerPng: React.FC = () => {
   useEffect(() => {
     const sliceCount = 165;
     const slicePath = (i: number) =>
-      `/model2_1png/xy/${String(i).padStart(3, "0")}.png`;
+      `${brightfieldBlobUrl}/xy/${String(i).padStart(3, "0")}.png`;
 
     const loadStackAndRender = async () => {
       const imagePromises = Array.from({ length: sliceCount }, (_, z) => {

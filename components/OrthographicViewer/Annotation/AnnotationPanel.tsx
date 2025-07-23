@@ -34,10 +34,12 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
     <div style={{ position: "absolute", bottom: 110, left: 10, zIndex: 10 }} ref={menuRef}>
       <button
         onClick={() => setShowMenu((prev) => !prev)}
-        className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white transition-colors"
+        className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 dark:hover:bg-red-400 dark:hover:text-white hover:text-white transition-colors group"
         title="Annotation options"
       >
-        <Pen size={20} />
+        <div className="relative">
+          <Pen size={20} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
+        </div>
       </button>
       {showMenu && (
         <div className="bg-white dark:bg-gray-800 shadow-lg rounded-md py-2 w-48 z-[1000]"
@@ -54,10 +56,12 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
             }}
             className={`flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white transition-colors ${
               isAnnotating ? "bg-blue-100 dark:bg-blue-900" : ""
-            }`}
+            } group`}
             title={isAnnotating ? "Disable annotating" : "Enable annotating"}
           >
-            <Edit size={16} className="mr-2" />
+            <div className="relative mr-2">
+              <Edit size={16} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
+            </div>
             {isAnnotating ? "Disable Annotating" : "Enable Annotating"}
           </button>
           <button
@@ -67,10 +71,12 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
             }}
             className={`flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white transition-colors ${
               showAnnotations ? "bg-blue-100 dark:bg-blue-900" : ""
-            }`}
+            } group`}
             title={showAnnotations ? "Hide annotations" : "Show annotations"}
           >
-            <Eye size={16} className="mr-2" />
+            <div className="relative mr-2">
+              <Eye size={16} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
+            </div>
             {showAnnotations ? "Hide Annotations" : "Show Annotations"}
           </button>
           <button
@@ -78,10 +84,12 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
               onOpenModal();
               setShowMenu(false);
             }}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white transition-colors"
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-500 hover:text-white transition-colors group"
             title="View all annotations"
           >
-            <List size={16} className="mr-2" />
+            <div className="relative mr-2">
+              <List size={16} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
+            </div>
             View All Annotations
           </button>
         </div>

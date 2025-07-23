@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import VolumeViewer from "@/components/VolumeViewerPng";
 import OrthographicViewer from "@/components/OrthographicViewer/OrthographicViewer";
-
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
   Breadcrumb,
@@ -22,12 +21,34 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 
 export default function ClientHome() {
   const [activeTab, setActiveTab] = useState<"orthographic" | "volume">(
     "orthographic"
   );
+  const searchParams = useSearchParams();
+  const datasetId = searchParams.get("datasetId");
 
+  const { data: dataset, isLoading, error } = useQuery({
+    queryKey: ["dataset", datasetId],
+    queryFn: async () => {
+      if (!datasetId) return null; // Return null if no datasetId
+      const response = await fetch(`/api/admin?datasetId=${datasetId}`);
+      if (!response.ok) throw new Error("Failed to fetch dataset");
+      const result = await response.json();
+      // Check for error or return dataset
+      if (result.error) return null; // Handle "Dataset not found"
+      return result.dataset || null; // Return the dataset or null if not found
+    },
+    enabled: !!datasetId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading) return <div>Loading dataset...</div>;
+  if (error) return <div>Error loading dataset: {error.message}</div>;
+  if (!dataset) return <div>Dataset not found or no dataset ID provided</div>;
 
   return (
     <SidebarProvider>
@@ -58,7 +79,6 @@ export default function ClientHome() {
           </div>
         </header>
 
-        {/* Toggle Tabs */}
         {/* Toggle Tabs */}
         <motion.div
           className="fixed top-4 left-1/2 transform -translate-x-1/2 z-30"
@@ -91,10 +111,16 @@ export default function ClientHome() {
             <div className="p-4">
               {activeTab === "orthographic" ? (
                 <Suspense fallback={<div>Loading...</div>}>
-                  <OrthographicViewer />
+                  <OrthographicViewer
+                    brightfieldBlobUrl={dataset.brightfieldBlobUrl}
+                    datasetName={dataset.name}
+                  />
                 </Suspense>
               ) : (
-                <VolumeViewer />
+                <VolumeViewer 
+                brightfieldBlobUrl={dataset.brightfieldBlobUrl}
+                datasetName={dataset.name}
+                />
               )}
             </div>
           </div>

@@ -32,7 +32,6 @@ const VolumeViewer: React.FC = () => {
       const reader = vtkXMLImageDataReader.newInstance();
       reader.parseAsArrayBuffer(arrayBuffer);
       const imageData = reader.getOutputData(0);
-
       const fullScreenRenderer = vtkFullScreenRenderWindow.newInstance({
         container: containerRef.current,
         background: [1, 1, 1],
@@ -100,7 +99,7 @@ const VolumeViewer: React.FC = () => {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <div ref={containerRef} style={{ flex: 1 }} />
 
-      <div style={{ padding: "10px", background: "#f0f0f0", display: "flex", gap: "20px", justifyContent: "center" }}>
+      <div style={{ padding: "10px", display: "flex", gap: "20px", justifyContent: "center" }}>
         <label>
           X Clip:
           <input

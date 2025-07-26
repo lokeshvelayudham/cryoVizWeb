@@ -18,12 +18,30 @@ import ViewControls from "./ViewControls";
 import OpacitySlider from "./OpacitySlider";
 import ShaderSelector from "./ShaderSelector";
 
-const VolumeViewerPng: React.FC<{ brightfieldBlobUrl: string; datasetName: string }> = ({ brightfieldBlobUrl, datasetName }) => {
+const VolumeViewerPng: React.FC<{
+  brightfieldBlobUrl: string;
+  datasetId: string;
+  brightfieldNumZ: number;
+  brightfieldNumY: number;
+  brightfieldNumX: number;
+  fluorescentNumZ: number;
+  fluorescentNumY: number;
+  fluorescentNumX: number;
+}> = ({
+  brightfieldBlobUrl,
+  datasetId,
+  brightfieldNumZ,
+  brightfieldNumY,
+  brightfieldNumX,
+  fluorescentNumZ,
+  fluorescentNumY,
+  fluorescentNumX,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [clip, setClip] = useState({ x: 0, y: 0, z: 0 });
   const [quality, setQuality] = useState(1.5);
   const [opacityLevel, setOpacityLevel] = useState(0.05);
-  const [volumeDims, setVolumeDims] = useState({ x: 600, y: 600, z: 165 });
+  const [volumeDims, setVolumeDims] = useState({ x: 600, y: 600, z: 527 });
   const [viewOrientation, setViewOrientation] = useState<string>("");
   const [blendMode, setBlendMode] = useState<string>("composite");
   const [loading, setLoading] = useState(true);
@@ -53,7 +71,7 @@ const VolumeViewerPng: React.FC<{ brightfieldBlobUrl: string; datasetName: strin
   }, [blendMode]);
 
   useEffect(() => {
-    const sliceCount = 165;
+    const sliceCount = brightfieldNumZ || fluorescentNumZ;
     const slicePath = (i: number) =>
       `${brightfieldBlobUrl}/xy/${String(i).padStart(3, "0")}.png`;
 
@@ -117,7 +135,7 @@ const VolumeViewerPng: React.FC<{ brightfieldBlobUrl: string; datasetName: strin
 
       const imageData = vtkImageData.newInstance();
       imageData.setDimensions([width, height, depth]);
-      imageData.setSpacing([1, 1, 3]);
+      imageData.setSpacing([1, 1, 2]);
 
       const scalars = vtkDataArray.newInstance({
         name: "ImageScalars",
@@ -129,7 +147,7 @@ const VolumeViewerPng: React.FC<{ brightfieldBlobUrl: string; datasetName: strin
       const mapper = vtkVolumeMapper.newInstance();
       mapper.setInputData(imageData);
       mapper.setSampleDistance(quality);
-      mapper.setMaximumSamplesPerRay(850);
+      mapper.setMaximumSamplesPerRay(1500);
       mapper.addClippingPlane(clipPlanes.current.planeX);
       mapper.addClippingPlane(clipPlanes.current.planeY);
       mapper.addClippingPlane(clipPlanes.current.planeZ);

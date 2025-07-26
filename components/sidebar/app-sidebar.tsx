@@ -55,8 +55,8 @@ const data = {
       ],
     },
     {
-      title: "Models",
-      url: "/models",
+      title: "Datasets",
+      url: "/users_datasets",
       icon: Bot,
       items: [],
     },

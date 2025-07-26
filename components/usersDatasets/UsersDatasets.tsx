@@ -30,7 +30,7 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 
-export default function Models() {
+export default function UsersDatasets() {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
@@ -78,12 +78,27 @@ export default function Models() {
       header: "Institution",
       cell: ({ row }) => {
         const institution = institutions.find(
-          (inst) => inst._id === row.original.institutionId
+          (inst: Institution) => inst._id?.toString() === row.original.institutionId?.toString()
         );
         return institution ? institution.name : "N/A";
       },
     },
   ];
+
+  // Custom filter function to include institution name in global search
+  const customFilterFn = (row: any, columnId: string, filterValue: string) => {
+    const dataset = row.original;
+    const institution = institutions.find(
+      (inst: Institution) => inst._id?.toString() === dataset.institutionId?.toString()
+    );
+    const searchTerm = filterValue.toLowerCase();
+    console.log("Filter Value:", filterValue, "Institution:", institution?.name); // Debug log
+    return (
+      dataset.name?.toLowerCase().includes(searchTerm) ||
+      dataset.description?.toLowerCase().includes(searchTerm) ||
+      (institution?.name?.toLowerCase().includes(searchTerm) || false)
+    );
+  };
 
   const table = useReactTable({
     data: userDatasets,
@@ -103,10 +118,15 @@ export default function Models() {
         pageSize: 6,
       },
     },
+    globalFilterFn: customFilterFn, // Apply custom filter function
   });
 
   if (isLoading) return <div>Loading datasets...</div>;
   if (error) return <div>Error loading datasets: {error.message}</div>;
+
+  // Determine if filtered results are empty
+  const filteredRows = table.getRowModel().rows;
+  const isEmptyState = filteredRows.length === 0;
 
   return (
     <div className="container mx-auto p-4">
@@ -120,6 +140,7 @@ export default function Models() {
         />
         <Select
           onValueChange={(value) => {
+            console.log("Selected Institution:", value); // Debug log
             setGlobalFilter(value === "all" ? "" : value);
           }}
         >
@@ -128,8 +149,8 @@ export default function Models() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Institutions</SelectItem>
-            {institutions.map((inst) => (
-              <SelectItem key={inst._id} value={inst.name}>
+            {institutions.map((inst: Institution) => (
+              <SelectItem key={inst._id?.toString() || ""} value={inst.name}>
                 {inst.name}
               </SelectItem>
             ))}
@@ -137,7 +158,7 @@ export default function Models() {
         </Select>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {table.getRowModel().rows.map((row) => {
+        {filteredRows.map((row) => {
           const institutionCell = row.getVisibleCells().find(
             (cell) => cell.column.id === "institutionId"
           );
@@ -157,7 +178,7 @@ export default function Models() {
           );
         })}
       </div>
-      {userDatasets.length === 0 && <p>No datasets available.</p>}
+      {isEmptyState && <p>No datasets available.</p>}
       <div className="flex items-center justify-end space-x-2 py-4">
         <Button
           variant="outline"

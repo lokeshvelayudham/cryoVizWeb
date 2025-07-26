@@ -1,8 +1,8 @@
-
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { Folder, X, Upload, List, Eye, Download, Trash2 } from "lucide-react";
+import { Folder, X, Download, List } from "lucide-react";
+import Draggable from "react-draggable";
 
 interface MediaFile {
   id: string;
@@ -12,137 +12,74 @@ interface MediaFile {
 }
 
 interface MediaControlPanelProps {
-  dataset: string;
+  datasetId: string;
   setErrorMessage: (message: string | null) => void;
 }
 
-export default function MediaControlPanel({ dataset, setErrorMessage }: MediaControlPanelProps) {
+export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaControlPanelProps) {
   const { data: session } = useSession();
   const userEmail = session?.user?.email || null;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isListModalOpen, setIsListModalOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [previewFile, setPreviewFile] = useState<MediaFile | null>(null);
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
+  const [previewModalPosition, setPreviewModalPosition] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<HTMLDivElement>(null);
+  const previewDragRef = useRef<HTMLDivElement>(null);
 
   const fetchFiles = async () => {
     if (!userEmail) return;
     try {
-      const response = await fetch(`/api/media?dataset=${dataset}`, {
+      const response = await fetch(`/api/media?dataset=${datasetId}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error("Failed to fetch files");
       const data = await response.json();
       setMediaFiles(data.files || []);
+      setSelectedFileIds([]); // Reset selection on fetch
     } catch (error: any) {
       console.error("Error fetching files:", error.message);
       setErrorMessage("Failed to fetch media files");
     }
   };
 
-  const uploadFile = async () => {
-    if (!userEmail) {
-      setErrorMessage("Please log in to upload files");
-      return;
-    }
-    if (!selectedFile) {
-      setErrorMessage("Please select a file to upload");
-      return;
-    }
-    try {
-      const response = await fetch(`/api/media/sas?dataset=${dataset}&filename=${encodeURIComponent(selectedFile.name)}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) throw new Error(`Failed to get SAS token: ${response.statusText}`);
-      const { sasUrl, blobName } = await response.json();
-      console.log("Uploading to:", sasUrl);
-
-      // Upload using fetch
-      const uploadResponse = await fetch(sasUrl, {
-        method: "PUT",
-        headers: {
-          "x-ms-blob-type": "BlockBlob",
-          "x-ms-blob-content-type": getContentType(selectedFile.name),
-        },
-        body: selectedFile,
-      });
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Upload failed: ${errorText}`);
-      }
-
-      // Save metadata to MongoDB
-      const metadataResponse = await fetch("/api/media", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dataset,
-          filename: selectedFile.name,
-          user: userEmail,
-          format: selectedFile.name.split(".").pop()?.toLowerCase(),
-          url: `https://bivlargefiles.blob.core.windows.net/media/${blobName}`,
-          chunkSize: 261120,
-          length: selectedFile.size,
-        }),
-      });
-      if (!metadataResponse.ok) throw new Error("Failed to save metadata");
-
-      console.log("File uploaded:", selectedFile.name);
-      setSelectedFile(null);
-      setIsUploadModalOpen(false);
-      await fetchFiles();
-    } catch (error: any) {
-      console.error("Error uploading file:", error.message);
-      setErrorMessage(`Failed to upload file: ${error.message}`);
-    }
-  };
-
-  const deleteFile = async (filename: string) => {
-    if (!userEmail) {
-      setErrorMessage("Please log in to delete files");
-      return;
-    }
-    try {
-      const response = await fetch(`/api/media?dataset=${dataset}&filename=${encodeURIComponent(filename)}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) throw new Error("Failed to delete file");
-      console.log("File deleted:", filename);
-      setMediaFiles((prev) => prev.filter((file) => file.name !== filename));
-      if (previewFile?.name === filename) setPreviewFile(null);
-    } catch (error: any) {
-      console.error("Error deleting file:", error.message);
-      setErrorMessage("Failed to delete file");
-    }
-  };
-
   const downloadFile = async (file: MediaFile) => {
     try {
-      // Fetch the file as a blob
       const response = await fetch(file.url, {
         method: "GET",
       });
       if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
       const blob = await response.blob();
-      
-      // Create a temporary URL for the blob
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = file.name;
       document.body.appendChild(link);
       link.click();
-      
-      // Clean up
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error: any) {
       console.error("Error downloading file:", error.message);
-      setErrorMessage(`Failed to download file: ${error.message}`);
+      setErrorMessage(`Failed to download file: ${file.name}`);
+    }
+  };
+
+  const downloadSelectedFiles = async () => {
+    if (selectedFileIds.length === 0) {
+      setErrorMessage("No files selected for download");
+      return;
+    }
+    try {
+      for (const filename of selectedFileIds) {
+        const file = mediaFiles.find((f) => f.name === filename);
+        if (file) await downloadFile(file);
+      }
+      setErrorMessage(null);
+    } catch (error: any) {
+      setErrorMessage("Failed to download some files");
     }
   };
 
@@ -181,9 +118,71 @@ export default function MediaControlPanel({ dataset, setErrorMessage }: MediaCon
     return <p className="text-sm text-gray-500 dark:text-gray-400">Preview not available</p>;
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedFileIds(mediaFiles.map((file) => file.name));
+    } else {
+      setSelectedFileIds([]);
+    }
+  };
+
+  const handleSelectFile = (filename: string, checked: boolean) => {
+    if (checked) {
+      setSelectedFileIds((prev) => [...prev, filename]);
+    } else {
+      setSelectedFileIds((prev) => prev.filter((id) => id !== filename));
+    }
+  };
+
   useEffect(() => {
     if (userEmail) fetchFiles();
   }, [userEmail]);
+
+  useEffect(() => {
+    if (isListModalOpen) {
+      const modalWidth = 384; // Approximate max-w-md
+      const modalHeight = 400; // Approximate height
+      const x = (window.innerWidth - modalWidth) / 2;
+      const y = (window.innerHeight - modalHeight) / 2;
+      setModalPosition({ x, y });
+    }
+  }, [isListModalOpen]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (isListModalOpen) {
+        setModalPosition((prev) => ({
+          x: Math.min(prev.x, window.innerWidth - (dragRef.current?.offsetWidth || 384)),
+          y: Math.min(prev.y, window.innerHeight - (dragRef.current?.offsetHeight || 400)),
+        }));
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isListModalOpen]);
+
+  useEffect(() => {
+    if (previewFile) {
+      const modalWidth = 384; // Approximate max-w-md
+      const modalHeight = 400; // Approximate height
+      const x = (window.innerWidth - modalWidth) / 2;
+      const y = (window.innerHeight - modalHeight) / 2;
+      setPreviewModalPosition({ x, y });
+    }
+  }, [previewFile]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (previewFile) {
+        setPreviewModalPosition((prev) => ({
+          x: Math.min(prev.x, window.innerWidth - (previewDragRef.current?.offsetWidth || 384)),
+          y: Math.min(prev.y, window.innerHeight - (previewDragRef.current?.offsetHeight || 400)),
+        }));
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [previewFile]);
 
   return (
     <>
@@ -206,21 +205,6 @@ export default function MediaControlPanel({ dataset, setErrorMessage }: MediaCon
               <li>
                 <button
                   onClick={() => {
-                    setIsUploadModalOpen(true);
-                    setIsDropdownOpen(false);
-                  }}
-                  className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 group"
-                  title="Upload a file"
-                >
-                  <div className="relative mr-2">
-                    <Upload className="w-4 h-4 transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
-                  </div>
-                  Upload File
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => {
                     setIsListModalOpen(true);
                     setIsDropdownOpen(false);
                   }}
@@ -237,51 +221,24 @@ export default function MediaControlPanel({ dataset, setErrorMessage }: MediaCon
           </div>
         )}
       </div>
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[1000]">
-          <div className="bg-white dark:bg-gray-900 p-4 rounded-lg w-full max-w-sm shadow-md transition-all duration-200">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-md font-medium text-gray-900 dark:text-gray-100">Upload File</h2>
-              <button
-                onClick={() => setIsUploadModalOpen(false)}
-                className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <input
-              type="file"
-              accept=".txt,.mp4,.jpeg,.jpg,.pdf,.png"
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-              className="border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 w-full text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 mb-3"
-            />
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setIsUploadModalOpen(false)}
-                className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 transition-colors"
-                title="Cancel"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={uploadFile}
-                className="px-3 py-1.5 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
-                title="Upload file"
-              >
-                Upload
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {isListModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-lg">
-            <div className="flex justify-between items-center mb-4">
+        <Draggable
+          handle=".handle"
+          position={modalPosition}
+          onDrag={(e, data) => setModalPosition({ x: data.x, y: data.y })}
+          nodeRef={dragRef}
+        >
+          <div
+            ref={dragRef}
+            className="fixed top-0 left-0 z-[1000] bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md shadow-md"
+          >
+            <div className="flex justify-between items-center mb-4 handle" style={{ cursor: "move" }}>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Media Files</h2>
               <button
-                onClick={() => setIsListModalOpen(false)}
+                onClick={() => {
+                  setIsListModalOpen(false);
+                  setSelectedFileIds([]);
+                }}
                 className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-600"
                 title="Close"
               >
@@ -291,58 +248,75 @@ export default function MediaControlPanel({ dataset, setErrorMessage }: MediaCon
             {mediaFiles.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No uploaded files</p>
             ) : (
-              <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-400">
-                  <tr>
-                    <th className="px-2 py-1">File Name</th>
-                    <th className="px-2 py-1">Tag</th>
-                    <th className="px-2 py-1">Tools</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mediaFiles.map((file) => (
-                    <tr key={file.id} className="border-b dark:border-gray-700">
-                      <td className="px-2 py-1">{file.name}</td>
-                      <td className="px-2 py-1">{file.tag}</td>
-                      <td className="px-2 py-1 flex space-x-1">
-                        <button
+              <>
+                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                  <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-400">
+                    <tr>
+                      <th className="px-2 py-1 w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedFileIds.length === mediaFiles.length && mediaFiles.length > 0}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          className="w-4 h-4"
+                          title="Select all files"
+                        />
+                      </th>
+                      <th className="px-2 py-1">File Name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mediaFiles.map((file) => (
+                      <tr key={file.id} className="border-b dark:border-gray-700">
+                        <td className="px-2 py-1 w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedFileIds.includes(file.name)}
+                            onChange={(e) => handleSelectFile(file.name, e.target.checked)}
+                            className="w-4 h-4"
+                            title={`Select ${file.name}`}
+                          />
+                        </td>
+                        <td
+                          className="px-2 py-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 truncate"
                           onClick={() => {
                             setPreviewFile(file);
                             setIsListModalOpen(false);
                           }}
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600"
-                          title="View file"
+                          title={`View ${file.name}`}
                         >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => downloadFile(file)}
-                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-600"
-                          title="Download file"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteFile(file.name)}
-                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600"
-                          title="Delete file"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          {file.name}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-end space-x-2 mt-4">
+                  <button
+                    onClick={downloadSelectedFiles}
+                    className="p-1 text-xs rounded-md bg-gray-500 text-white hover:bg-gray-600 transition-colors"
+                    title="Download selected files"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
+              </>
             )}
           </div>
-        </div>
+        </Draggable>
       )}
       {previewFile && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[2000]">
-          <div className="bg-white dark:bg-gray-900 p-4 rounded-lg w-full max-w-md shadow-md transition-all duration-200">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-md font-medium text-gray-900 dark:text-gray-100">{previewFile.name}</h2>
+        <Draggable
+          handle=".preview-handle"
+          position={previewModalPosition}
+          onDrag={(e, data) => setPreviewModalPosition({ x: data.x, y: data.y })}
+          nodeRef={previewDragRef}
+        >
+          <div
+            ref={previewDragRef}
+            className="fixed top-0 left-0 z-[2000] bg-white dark:bg-gray-900 p-4 rounded-lg w-full max-w-md shadow-md transition-all duration-200"
+          >
+            <div className="flex justify-between items-center mb-3 preview-handle" style={{ cursor: "move" }}>
+              <h2 className="text-md font-medium text-gray-900 dark:text-gray-100 truncate">{previewFile.name}</h2>
               <button
                 onClick={() => setPreviewFile(null)}
                 className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
@@ -360,7 +334,7 @@ export default function MediaControlPanel({ dataset, setErrorMessage }: MediaCon
               Close
             </button>
           </div>
-        </div>
+        </Draggable>
       )}
     </>
   );

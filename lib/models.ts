@@ -47,8 +47,13 @@ export interface Dataset {
   imageDims?: { x?: number; y?: number; z?: number };
   assignedUsers?: string[];
   createdAt: Date;
+  brightfieldNumZ?: number;
+  brightfieldNumY?: number;
+  brightfieldNumX?: number;
+  fluorescentNumZ?: number;
+  fluorescentNumY?: number;
+  fluorescentNumX?: number;
 }
-
 /**
  * Retrieves all institutions from the database.
  * @returns A promise resolving to an array of Institution objects.
@@ -237,7 +242,44 @@ export async function createDataset(dataset: Omit<Dataset, "_id" | "createdAt">)
   try {
     const client = await clientPromise;
     const db = client.db();
-    const data = { ...dataset, createdAt: new Date() };
+
+    // Sanitize numeric fields
+    const sanitizedDataset: Omit<Dataset, "_id" | "createdAt"> = {
+      ...dataset,
+      voxels: typeof dataset.voxels === "number" && !isNaN(dataset.voxels) ? dataset.voxels : undefined,
+      thickness: typeof dataset.thickness === "number" && !isNaN(dataset.thickness) ? dataset.thickness : undefined,
+      pixelLengthUM: typeof dataset.pixelLengthUM === "number" && !isNaN(dataset.pixelLengthUM) ? dataset.pixelLengthUM : undefined,
+      zSkip: typeof dataset.zSkip === "number" && !isNaN(dataset.zSkip) ? dataset.zSkip : undefined,
+      dims3: dataset.dims3
+        ? {
+            x: typeof dataset.dims3.x === "number" && !isNaN(dataset.dims3.x) ? dataset.dims3.x : undefined,
+            y: typeof dataset.dims3.y === "number" && !isNaN(dataset.dims3.y) ? dataset.dims3.y : undefined,
+            z: typeof dataset.dims3.z === "number" && !isNaN(dataset.dims3.z) ? dataset.dims3.z : undefined,
+          }
+        : undefined,
+      dims2: dataset.dims2
+        ? {
+            x: typeof dataset.dims2.x === "number" && !isNaN(dataset.dims2.x) ? dataset.dims2.x : undefined,
+            y: typeof dataset.dims2.y === "number" && !isNaN(dataset.dims2.y) ? dataset.dims2.y : undefined,
+            z: typeof dataset.dims2.z === "number" && !isNaN(dataset.dims2.z) ? dataset.dims2.z : undefined,
+          }
+        : undefined,
+      imageDims: dataset.imageDims
+        ? {
+            x: typeof dataset.imageDims.x === "number" && !isNaN(dataset.imageDims.x) ? dataset.imageDims.x : undefined,
+            y: typeof dataset.imageDims.y === "number" && !isNaN(dataset.imageDims.y) ? dataset.imageDims.y : undefined,
+            z: typeof dataset.imageDims.z === "number" && !isNaN(dataset.imageDims.z) ? dataset.imageDims.z : undefined,
+          }
+        : undefined,
+      brightfieldNumZ: typeof dataset.brightfieldNumZ === "number" && !isNaN(dataset.brightfieldNumZ) ? dataset.brightfieldNumZ : undefined,
+      brightfieldNumY: typeof dataset.brightfieldNumY === "number" && !isNaN(dataset.brightfieldNumY) ? dataset.brightfieldNumY : undefined,
+      brightfieldNumX: typeof dataset.brightfieldNumX === "number" && !isNaN(dataset.brightfieldNumX) ? dataset.brightfieldNumX : undefined,
+      fluorescentNumZ: typeof dataset.fluorescentNumZ === "number" && !isNaN(dataset.fluorescentNumZ) ? dataset.fluorescentNumZ : undefined,
+      fluorescentNumY: typeof dataset.fluorescentNumY === "number" && !isNaN(dataset.fluorescentNumY) ? dataset.fluorescentNumY : undefined,
+      fluorescentNumX: typeof dataset.fluorescentNumX === "number" && !isNaN(dataset.fluorescentNumX) ? dataset.fluorescentNumX : undefined,
+    };
+
+    const data = { ...sanitizedDataset, createdAt: new Date() };
     const result = await db.collection<Dataset>("datasets").insertOne(data);
     const datasetId = result.insertedId.toString();
 

@@ -8,13 +8,17 @@ export async function POST(req: NextRequest) {
     const db = client.db();
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
+    const datasetId = url.searchParams.get("datasetId");
     const { user } = await req.json();
 
-    if (!id || !user) {
-      return NextResponse.json({ error: "ID and user are required" }, { status: 400 });
+    if (!id || !user || !datasetId) {
+      return NextResponse.json({ error: "id, user, and datasetId are required" }, { status: 400 });
     }
 
-    const view = await db.collection("views").findOne({ $or: [{ _id: new ObjectId(id) }, { id }] });
+    const view = await db.collection("views").findOne({
+      _id: new ObjectId(id),
+      datasetId,
+    });
     if (!view) {
       return NextResponse.json({ error: "View not found" }, { status: 404 });
     }
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest) {
       : [...loadStats, { user, count: 1, lastLoad: new Date() }];
 
     const result = await db.collection("views").updateOne(
-      { $or: [{ _id: new ObjectId(id) }, { id }] },
+      { _id: new ObjectId(id), datasetId },
       { $set: { loadCount: view.loadCount + 1, loadStats: updatedStats } }
     );
 

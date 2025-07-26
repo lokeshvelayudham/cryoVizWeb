@@ -48,7 +48,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useForm, useFormContext, FormProvider } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import DatasetFormPage1 from "@/components/admin/Dataset/DatasetFormPage1";
@@ -64,24 +64,25 @@ const uploadDatasetSchema = z.object({
   brightfield: z.any().optional(),
   fluorescent: z.any().optional(),
   alpha: z.any().optional(),
-  voxels: z.number().optional(),
-  thickness: z.number().optional(),
-  pixelLengthUM: z.number().optional(),
-  zSkip: z.number().optional(),
+  voxels: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Voxels must be a valid number"),
+  thickness: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Thickness must be a valid number"),
+  pixelLengthUM: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Pixel Length UM must be a valid number"),
+  zSkip: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Z Skip must be a valid number"),
   specimen: z.string().optional(),
   pi: z.string().optional(),
-  dims3X: z.number().optional(),
-  dims3Y: z.number().optional(),
-  dims3Z: z.number().optional(),
-  dims2X: z.number().optional(),
-  dims2Y: z.number().optional(),
-  dims2Z: z.number().optional(),
-  imageDimsX: z.number().optional(),
-  imageDimsY: z.number().optional(),
-  imageDimsZ: z.number().optional(),
+  dims3X: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims3X must be a valid number"),
+  dims3Y: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims3Y must be a valid number"),
+  dims3Z: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims3Z must be a valid number"),
+  dims2X: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims2X must be a valid number"),
+  dims2Y: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims2Y must be a valid number"),
+  dims2Z: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims2Z must be a valid number"),
+  imageDimsX: z.number().optional().refine((val) => val === undefined || !isNaN(val), "ImageDimsX must be a valid number"),
+  imageDimsY: z.number().optional().refine((val) => val === undefined || !isNaN(val), "ImageDimsY must be a valid number"),
+  imageDimsZ: z.number().optional().refine((val) => val === undefined || !isNaN(val), "ImageDimsZ must be a valid number"),
   liverTiff: z.any().optional(),
   tumorTiff: z.any().optional(),
   assignedUsers: z.array(z.string()).optional(),
+
 });
 
 type UploadDatasetForm = z.infer<typeof uploadDatasetSchema>;
@@ -94,19 +95,53 @@ export default function Datasets() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false); // State for assign users modal
+  const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showUsersOpen, setShowUsersOpen] = useState(false); // State for showing users dialog
-  const [selectedDatasetUsers, setSelectedDatasetUsers] = useState<User[]>([]); // Users for the selected dataset
-  const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>([]); // Selected users for assignment
+  const [showUsersOpen, setShowUsersOpen] = useState(false);
+  const [selectedDatasetUsers, setSelectedDatasetUsers] = useState<User[]>([]);
+  const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/admin");
       const data = await response.json();
-      setDatasets(data.datasets || []);
+      const datasets = data.datasets || [];
+      // Log datasets to identify invalid values
+      datasets.forEach((dataset: Dataset, index: number) => {
+        if (dataset.voxels !== undefined && typeof dataset.voxels !== "number") {
+          console.warn(`Invalid voxels value in dataset ${index}:`, dataset);
+        }
+        if (dataset.thickness !== undefined && typeof dataset.thickness !== "number") {
+          console.warn(`Invalid thickness value in dataset ${index}:`, dataset);
+        }
+        if (dataset.pixelLengthUM !== undefined && typeof dataset.pixelLengthUM !== "number") {
+          console.warn(`Invalid pixelLengthUM value in dataset ${index}:`, dataset);
+        }
+        if (dataset.zSkip !== undefined && typeof dataset.zSkip !== "number") {
+          console.warn(`Invalid zSkip value in dataset ${index}:`, dataset);
+        }
+        if (dataset.brightfieldNumZ !== undefined && typeof dataset.brightfieldNumZ !== "number") {
+          console.warn(`Invalid brightfieldNumZ value in dataset ${index}:`, dataset);
+        }
+        if (dataset.brightfieldNumY !== undefined && typeof dataset.brightfieldNumY !== "number") {
+          console.warn(`Invalid brightfieldNumY value in dataset ${index}:`, dataset);
+        }
+        if (dataset.brightfieldNumX !== undefined && typeof dataset.brightfieldNumX !== "number") {
+          console.warn(`Invalid brightfieldNumX value in dataset ${index}:`, dataset);
+        }
+        if (dataset.fluorescentNumZ !== undefined && typeof dataset.fluorescentNumZ !== "number") {
+          console.warn(`Invalid fluorescentNumZ value in dataset ${index}:`, dataset);
+        }
+        if (dataset.fluorescentNumY !== undefined && typeof dataset.fluorescentNumY !== "number") {
+          console.warn(`Invalid fluorescentNumY value in dataset ${index}:`, dataset);
+        }
+        if (dataset.fluorescentNumX !== undefined && typeof dataset.fluorescentNumX !== "number") {
+          console.warn(`Invalid fluorescentNumX value in dataset ${index}:`, dataset);
+        }
+      });
+      setDatasets(datasets);
       setInstitutions(data.institutions || []);
       setUsers(data.users || []);
     } catch (error) {
@@ -155,22 +190,34 @@ export default function Datasets() {
     {
       accessorKey: "voxels",
       header: "Voxels",
-      cell: ({ row }) => row.original.voxels?.toFixed(3) || "N/A",
+      cell: ({ row }) => {
+        const voxels = row.original.voxels;
+        return typeof voxels === "number" && !isNaN(voxels) ? voxels.toFixed(3) : "N/A";
+      },
     },
     {
       accessorKey: "thickness",
       header: "Thickness",
-      cell: ({ row }) => row.original.thickness || "N/A",
+      cell: ({ row }) => {
+        const thickness = row.original.thickness;
+        return typeof thickness === "number" && !isNaN(thickness) ? thickness.toFixed(3) : "N/A";
+      },
     },
     {
       accessorKey: "pixelLengthUM",
       header: "Pixel Length (UM)",
-      cell: ({ row }) => row.original.pixelLengthUM?.toFixed(1) || "N/A",
+      cell: ({ row }) => {
+        const pixelLengthUM = row.original.pixelLengthUM;
+        return typeof pixelLengthUM === "number" && !isNaN(pixelLengthUM) ? pixelLengthUM.toFixed(1) : "N/A";
+      },
     },
     {
       accessorKey: "zSkip",
       header: "Z Skip",
-      cell: ({ row }) => row.original.zSkip || "N/A",
+      cell: ({ row }) => {
+        const zSkip = row.original.zSkip;
+        return typeof zSkip === "number" && !isNaN(zSkip) ? zSkip.toString() : "N/A";
+      },
     },
     {
       accessorKey: "specimen",
@@ -186,7 +233,10 @@ export default function Datasets() {
       accessorKey: "imageDims",
       header: "Image Dims",
       cell: ({ row }) =>
-        row.original.imageDims ? `${row.original.imageDims.x}x${row.original.imageDims.y}x${row.original.imageDims.z}` : "N/A",
+        row.original.imageDims && typeof row.original.imageDims.x === "number" &&
+        typeof row.original.imageDims.y === "number" && typeof row.original.imageDims.z === "number"
+          ? `${row.original.imageDims.x}x${row.original.imageDims.y}x${row.original.imageDims.z}`
+          : "N/A",
     },
     {
       id: "actions",
@@ -280,21 +330,21 @@ export default function Datasets() {
       brightfield: null,
       fluorescent: null,
       alpha: null,
-      voxels: dataset.voxels,
-      thickness: dataset.thickness,
-      pixelLengthUM: dataset.pixelLengthUM,
-      zSkip: dataset.zSkip,
+      voxels: typeof dataset.voxels === "number" && !isNaN(dataset.voxels) ? dataset.voxels : undefined,
+      thickness: typeof dataset.thickness === "number" && !isNaN(dataset.thickness) ? dataset.thickness : undefined,
+      pixelLengthUM: typeof dataset.pixelLengthUM === "number" && !isNaN(dataset.pixelLengthUM) ? dataset.pixelLengthUM : undefined,
+      zSkip: typeof dataset.zSkip === "number" && !isNaN(dataset.zSkip) ? dataset.zSkip : undefined,
       specimen: dataset.specimen || "",
       pi: dataset.pi || "",
-      dims3X: dataset.dims3?.x,
-      dims3Y: dataset.dims3?.y,
-      dims3Z: dataset.dims3?.z,
-      dims2X: dataset.dims2?.x,
-      dims2Y: dataset.dims2?.y,
-      dims2Z: dataset.dims2?.z,
-      imageDimsX: dataset.imageDims?.x,
-      imageDimsY: dataset.imageDims?.y,
-      imageDimsZ: dataset.imageDims?.z,
+      dims3X: typeof dataset.dims3?.x === "number" && !isNaN(dataset.dims3.x) ? dataset.dims3.x : undefined,
+      dims3Y: typeof dataset.dims3?.y === "number" && !isNaN(dataset.dims3.y) ? dataset.dims3.y : undefined,
+      dims3Z: typeof dataset.dims3?.z === "number" && !isNaN(dataset.dims3.z) ? dataset.dims3.z : undefined,
+      dims2X: typeof dataset.dims2?.x === "number" && !isNaN(dataset.dims2.x) ? dataset.dims2.x : undefined,
+      dims2Y: typeof dataset.dims2?.y === "number" && !isNaN(dataset.dims2.y) ? dataset.dims2.y : undefined,
+      dims2Z: typeof dataset.dims2?.z === "number" && !isNaN(dataset.dims2.z) ? dataset.dims2.z : undefined,
+      imageDimsX: typeof dataset.imageDims?.x === "number" && !isNaN(dataset.imageDims.x) ? dataset.imageDims.x : undefined,
+      imageDimsY: typeof dataset.imageDims?.y === "number" && !isNaN(dataset.imageDims.y) ? dataset.imageDims.y : undefined,
+      imageDimsZ: typeof dataset.imageDims?.z === "number" && !isNaN(dataset.imageDims.z) ? dataset.imageDims.z : undefined,
       liverTiff: null,
       tumorTiff: null,
       assignedUsers: dataset.assignedUsers || [],
@@ -305,15 +355,22 @@ export default function Datasets() {
 
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
-      const response = await fetch("/api/admin", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "delete-dataset" }),
-      });
-      if (response.ok) {
-        fetchData();
-      } else {
-        alert("Failed to delete dataset");
+      try {
+        const response = await fetch("/api/admin", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, action: "delete-dataset" }),
+        });
+        if (response.ok) {
+          fetchData();
+        } else {
+          const errorData = await response.json();
+          console.error("Failed to delete dataset:", errorData);
+          alert(errorData.error || "Failed to delete dataset");
+        }
+      } catch (error) {
+        console.error("Error deleting dataset:", error);
+        alert("Error deleting dataset");
       }
     }
   };
@@ -347,7 +404,9 @@ export default function Datasets() {
             setSelectedDatasetUsers(updatedUsers);
           }
         } else {
-          alert("Failed to remove user from dataset");
+          const errorData = await response.json();
+          console.error("Failed to remove user:", errorData);
+          alert(errorData.error || "Failed to remove user from dataset");
         }
       } catch (error) {
         console.error("Error removing user:", error);
@@ -380,6 +439,7 @@ export default function Datasets() {
         fetchData();
         setIsAssignUsersOpen(false);
       } else {
+        console.error("Failed to assign users:", result.error);
         alert(result.error || "Failed to assign users to dataset");
       }
     } catch (error) {
@@ -417,24 +477,31 @@ export default function Datasets() {
       if (data.assignedUsers) {
         formData.append("assignedUsers", JSON.stringify(data.assignedUsers));
       }
-      formData.append("action", "dataset");
 
-      const response = await fetch("/api/admin", {
+      const response = await fetch("/api/upload-dataset", {
         method: "POST",
         body: formData,
       });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Server response error:", errorData);
+        throw new Error(`Server error: ${response.status} ${response.statusText} - ${errorData}`);
+      }
+
       const result = await response.json();
-      if (response.ok) {
+      if (result.success) {
         fetchData();
         setIsUploadOpen(false);
         reset();
         setCurrentPage(1);
       } else {
+        console.error("Failed to upload dataset:", result.error);
         alert(result.error || "Failed to upload dataset");
       }
-    } catch (error) {
-      console.error("Error uploading dataset:", error);
-      alert("Error uploading dataset");
+    } catch (error: any) {
+      console.error("Error uploading dataset:", error.message);
+      alert(`Error uploading dataset: ${error.message}`);
     }
   };
 
@@ -603,7 +670,6 @@ export default function Datasets() {
               <Select
                 value={institutions.find((inst) => inst._id?.toString() === selectedDataset?.institutionId?.toString())?._id?.toString() || ""}
                 onValueChange={(value) => {
-                  // Filter users based on the selected institution
                   const filteredUsers = users.filter((user) => user.institutionId?.toString() === value);
                   setSelectedAssignedUsers(filteredUsers.map((user) => user._id?.toString() || ""));
                 }}
@@ -623,9 +689,9 @@ export default function Datasets() {
             <div>
               <label className="block text-sm font-medium text-gray-700">Select Users</label>
               <Select
-                multiple
-                value={selectedAssignedUsers}
-                onValueChange={(values) => setSelectedAssignedUsers(values)}
+                // multiple
+                value={selectedAssignedUsers.join(',')}
+                onValueChange={(values) => setSelectedAssignedUsers(values.split(',') as string[])}
               >
                 <SelectTrigger className="w-full mt-1">
                   <SelectValue placeholder="Select users" />

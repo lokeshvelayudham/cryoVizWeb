@@ -19,13 +19,7 @@ export default function AdminPanel() {
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [datasets, setDatasets] = useState<string[]>([
-    "WM_00852_Mouse2_5",
-    "Mouse884",
-    "WM_CITAP_00780",
-    "Brain",
-    "MouseLoki2",
-  ]);
+  const [datasets, setDatasets] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",

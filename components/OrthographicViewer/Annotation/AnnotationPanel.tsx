@@ -42,13 +42,15 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
         </div>
       </button>
       {showMenu && (
-        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-md py-2 w-48 z-[1000]"
-        style={{
-          position: "absolute",
-          bottom: 40,
-          left: 40,
-          fontSize: "0.85rem",
-        }}>
+        <div
+          className="bg-white dark:bg-gray-800 shadow-lg rounded-md py-2 w-48 z-[1000]"
+          style={{
+            position: "absolute",
+            bottom: 40,
+            left: 40,
+            fontSize: "0.85rem",
+          }}
+        >
           <button
             onClick={() => {
               onToggleAnnotating();
@@ -81,6 +83,9 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
           </button>
           <button
             onClick={() => {
+              if (!showAnnotations) {
+                onToggleVisibility(); // Ensure annotations are shown
+              }
               onOpenModal();
               setShowMenu(false);
             }}

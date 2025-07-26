@@ -8,17 +8,13 @@ import LoadingOverlay from "./LoadingOverlay";
 import AnnotationPanel from "./Annotation/AnnotationPanel";
 import AnnotationTextBox from "./Annotation/AnnotationTextBox";
 import AnnotationModal from "./Annotation/AnnotationModal";
-import ViewControlPanel from "./ViewControlPanel";
+import ViewControlPanel from "./Views/ViewControlPanel";
 import useAnnotations from "./Annotation/useAnnotations";
 import useCanvas from "./useCanvas";
 import useMeasurements from "./useMeasurements";
-
 import MediaControlPanel from "./MediaControlPanel";
 
 
-const NUM_Z = 165; // slicesXY (Z-axis slices)
-const NUM_Y = 416; // slicesXZ (Y-axis slices)
-const NUM_X = 1118; // slicesYZ (X-axis slices)
 
 type Point = { x: number; y: number };
 type MeasureData = {
@@ -26,14 +22,41 @@ type MeasureData = {
   lines: { p1: Point; p2: Point; dist: number }[];
 };
 
-export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: { brightfieldBlobUrl: string; datasetName: string }) {  
+export default function OrthographicViewer({
+  brightfieldBlobUrl,
+  datasetId,
+  brightfieldNumZ,
+  brightfieldNumY,
+  brightfieldNumX,
+  fluorescentNumZ,
+  fluorescentNumY,
+  fluorescentNumX,
+}: {
+  brightfieldBlobUrl: string;
+  datasetId: string;
+  brightfieldNumZ: number;
+  brightfieldNumY: number;
+  brightfieldNumX: number;
+  fluorescentNumZ: number;
+  fluorescentNumY: number;
+  fluorescentNumX: number;
+}) {
+  // Guard clause for invalid datasetId
+  if (!datasetId) {
+    return (
+      <div className="h-full w-full p-4 flex items-center justify-center">
+        <p className="text-red-500">Error: Please select a dataset to view.</p>
+      </div>
+    );
+  }
+
   const { theme } = useTheme();
   const { data: session, status } = useSession();
   const userEmail = session?.user?.email || null;
   const [coords, setCoords] = useState({
-    x: Math.floor(NUM_X / 2),
-    y: Math.floor(NUM_Y / 2),
-    z: Math.floor(NUM_Z / 2),
+    x: Math.floor(brightfieldNumX / 2 || fluorescentNumX / 2),
+    y: Math.floor(brightfieldNumY / 2 || fluorescentNumY / 2),
+    z: Math.floor(brightfieldNumZ / 2 || fluorescentNumZ / 2),
   });
 
   const [loading, setLoading] = useState(true);
@@ -55,7 +78,7 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
     color: string;
   } | null>(null);
 
-  // Use the annotations hook
+  // Use the annotations hook with datasetId
   const {
     annotations,
     isAnnotating,
@@ -72,7 +95,7 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
     deleteAnnotationFromMongoDB,
     handleEditAnnotation,
     handleSaveEdit,
-  } = useAnnotations(userEmail, setErrorMessage);
+  } = useAnnotations(userEmail, setErrorMessage, datasetId);
 
   // Use the canvas hook
   const {
@@ -102,21 +125,36 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
     preloadImages,
     drawAll,
     activePixelColor: canvasActivePixelColor,
-  } = useCanvas(theme, coords, measureData, setLoading, setErrorMessage, setCoords, brightfieldBlobUrl);
+  } = useCanvas(
+    theme,
+    coords,
+    measureData,
+    setLoading,
+    setErrorMessage,
+    setCoords,
+    brightfieldBlobUrl,
+    brightfieldNumZ,
+    brightfieldNumY,
+    brightfieldNumX,
+    fluorescentNumZ,
+    fluorescentNumY,
+    fluorescentNumX
+  );
 
   // Use the measurements hook
-  const {
-    micronsPerPixel,
-    handleMeasureClick,
-    handleToggleMeasure,
-  } = useMeasurements(
-    { XY: canvasXY as React.RefObject<HTMLCanvasElement>, XZ: canvasXZ as React.RefObject<HTMLCanvasElement>, YZ: canvasYZ as React.RefObject<HTMLCanvasElement> },
-    { XY: panXY, XZ: panXZ, YZ: panYZ },
-    { XY: zoomXY, XZ: zoomXZ, YZ: zoomYZ },
-    drawAll,
-    measureData,
-    setMeasureData
-  );
+  const { micronsPerPixel, handleMeasureClick, handleToggleMeasure } =
+    useMeasurements(
+      {
+        XY: canvasXY as React.RefObject<HTMLCanvasElement>,
+        XZ: canvasXZ as React.RefObject<HTMLCanvasElement>,
+        YZ: canvasYZ as React.RefObject<HTMLCanvasElement>,
+      },
+      { XY: panXY, XZ: panXZ, YZ: panYZ },
+      { XY: zoomXY, XZ: zoomXZ, YZ: zoomYZ },
+      drawAll,
+      measureData,
+      setMeasureData
+    );
 
   // Sync activePixelColor from useCanvas
   useEffect(() => {
@@ -168,7 +206,7 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
       instance: 0,
       datetime: Date.now(),
       user: userEmail,
-      dataset: "Brain",
+      datasetId,
       status: "active",
     };
 
@@ -194,9 +232,9 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
 
   const handleReset = () => {
     setCoords({
-      x: Math.floor(NUM_X / 2),
-      y: Math.floor(NUM_Y / 2),
-      z: Math.floor(NUM_Z / 2),
+      x: Math.floor(brightfieldNumX / 2 || fluorescentNumX / 2),
+      y: Math.floor(brightfieldNumY / 2 || fluorescentNumY / 2),
+      z: Math.floor(brightfieldNumZ / 2 || fluorescentNumZ / 2),
     });
     setPanXY({ x: 0, y: 0 });
     setPanXZ({ x: 0, y: 0 });
@@ -220,7 +258,11 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
     setZoomYZ(zoom.YZ);
   };
 
-  const setPan = (pan: { XY: { x: number; y: number }; XZ: { x: number; y: number }; YZ: { x: number; y: number } }) => {
+  const setPan = (pan: {
+    XY: { x: number; y: number };
+    XZ: { x: number; y: number };
+    YZ: { x: number; y: number };
+  }) => {
     setPanXY(pan.XY);
     setPanXZ(pan.XZ);
     setPanYZ(pan.YZ);
@@ -261,6 +303,7 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
           handleSaveEdit={handleSaveEdit}
           deleteAnnotationFromMongoDB={deleteAnnotationFromMongoDB}
           onClose={() => setShowModal(false)}
+          setCoords={setCoords}
         />
       )}
       <div className="flex flex-col h-[90%]">
@@ -283,7 +326,8 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
           {showAnnotations &&
             annotations.map(
               (a) =>
-                a.view === "XY" && a.slice === coords.z && (
+                a.view === "XY" &&
+                a.slice === coords.z && (
                   <AnnotationTextBox
                     key={a._id || a.id}
                     annotation={a}
@@ -291,8 +335,15 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
                     panXY={panXY}
                     canvasRef={canvasXY as React.RefObject<HTMLCanvasElement>}
                     onUpdate={(id, text, newPos, save) => {
-                      console.log("AnnotationTextBox onUpdate:", { id, text, newPos, save });
-                      const updatedAnnotation = annotations.find((ann) => ann._id === id || ann.id === id);
+                      console.log("AnnotationTextBox onUpdate:", {
+                        id,
+                        text,
+                        newPos,
+                        save,
+                      });
+                      const updatedAnnotation = annotations.find(
+                        (ann) => ann._id === id || ann.id === id
+                      );
                       if (updatedAnnotation) {
                         const newAnnotation = {
                           ...updatedAnnotation,
@@ -300,12 +351,20 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
                           ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
                         };
                         setAnnotations((prev) =>
-                          prev.map((ann) => (ann._id === id || ann.id === id ? newAnnotation : ann))
+                          prev.map((ann) =>
+                            ann._id === id || ann.id === id
+                              ? newAnnotation
+                              : ann
+                          )
                         );
                         if (save && text && text.trim() !== "") {
                           saveAnnotationToMongoDB(newAnnotation, !!newPos);
                         } else if (save) {
-                          setAnnotations((prev) => prev.filter((ann) => ann._id !== id && ann.id !== id));
+                          setAnnotations((prev) =>
+                            prev.filter(
+                              (ann) => ann._id !== id && ann.id !== id
+                            )
+                          );
                         }
                       }
                     }}
@@ -332,7 +391,8 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
           {showAnnotations &&
             annotations.map(
               (a) =>
-                a.view === "XZ" && a.slice === coords.y && (
+                a.view === "XZ" &&
+                a.slice === coords.y && (
                   <AnnotationTextBox
                     key={a._id || a.id}
                     annotation={a}
@@ -340,8 +400,15 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
                     panXY={panXZ}
                     canvasRef={canvasXZ as React.RefObject<HTMLCanvasElement>}
                     onUpdate={(id, text, newPos, save) => {
-                      console.log("AnnotationTextBox onUpdate:", { id, text, newPos, save });
-                      const updatedAnnotation = annotations.find((ann) => ann._id === id || ann.id === id);
+                      console.log("AnnotationTextBox onUpdate:", {
+                        id,
+                        text,
+                        newPos,
+                        save,
+                      });
+                      const updatedAnnotation = annotations.find(
+                        (ann) => ann._id === id || ann.id === id
+                      );
                       if (updatedAnnotation) {
                         const newAnnotation = {
                           ...updatedAnnotation,
@@ -349,12 +416,20 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
                           ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
                         };
                         setAnnotations((prev) =>
-                          prev.map((ann) => (ann._id === id || ann.id === id ? newAnnotation : ann))
+                          prev.map((ann) =>
+                            ann._id === id || ann.id === id
+                              ? newAnnotation
+                              : ann
+                          )
                         );
                         if (save && text && text.trim() !== "") {
                           saveAnnotationToMongoDB(newAnnotation, !!newPos);
                         } else if (save) {
-                          setAnnotations((prev) => prev.filter((ann) => ann._id !== id && ann.id !== id));
+                          setAnnotations((prev) =>
+                            prev.filter(
+                              (ann) => ann._id !== id && ann.id !== id
+                            )
+                          );
                         }
                       }
                     }}
@@ -381,7 +456,8 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
           {showAnnotations &&
             annotations.map(
               (a) =>
-                a.view === "YZ" && a.slice === coords.x && (
+                a.view === "YZ" &&
+                a.slice === coords.x && (
                   <AnnotationTextBox
                     key={a._id || a.id}
                     annotation={a}
@@ -389,8 +465,15 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
                     panXY={panYZ}
                     canvasRef={canvasYZ as React.RefObject<HTMLCanvasElement>}
                     onUpdate={(id, text, newPos, save) => {
-                      console.log("AnnotationTextBox onUpdate:", { id, text, newPos, save });
-                      const updatedAnnotation = annotations.find((ann) => ann._id === id || ann.id === id);
+                      console.log("AnnotationTextBox onUpdate:", {
+                        id,
+                        text,
+                        newPos,
+                        save,
+                      });
+                      const updatedAnnotation = annotations.find(
+                        (ann) => ann._id === id || ann.id === id
+                      );
                       if (updatedAnnotation) {
                         const newAnnotation = {
                           ...updatedAnnotation,
@@ -398,12 +481,20 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
                           ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
                         };
                         setAnnotations((prev) =>
-                          prev.map((ann) => (ann._id === id || ann.id === id ? newAnnotation : ann))
+                          prev.map((ann) =>
+                            ann._id === id || ann.id === id
+                              ? newAnnotation
+                              : ann
+                          )
                         );
                         if (save && text && text.trim() !== "") {
                           saveAnnotationToMongoDB(newAnnotation, !!newPos);
                         } else if (save) {
-                          setAnnotations((prev) => prev.filter((ann) => ann._id !== id && ann.id !== id));
+                          setAnnotations((prev) =>
+                            prev.filter(
+                              (ann) => ann._id !== id && ann.id !== id
+                            )
+                          );
                         }
                       }
                     }}
@@ -437,7 +528,7 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
       <XYZControls
         coords={coords}
         onChange={handleSlider}
-        limits={{ x: NUM_X - 1, y: NUM_Y - 1, z: NUM_Z - 1 }}
+        limits={{ x: (brightfieldNumX || fluorescentNumX) - 1, y: (brightfieldNumY || fluorescentNumY) - 1, z: (brightfieldNumZ || fluorescentNumZ) - 1 }}
         onReset={handleReset}
       />
       <ViewControlPanel
@@ -451,10 +542,12 @@ export default function OrthographicViewer({ brightfieldBlobUrl, datasetName }: 
         canvasXZ={canvasXZ as React.RefObject<HTMLCanvasElement>}
         canvasYZ={canvasYZ as React.RefObject<HTMLCanvasElement>}
         setErrorMessage={setErrorMessage}
+        datasetId={datasetId}
       />
-
-      {/* Media Control Panel */}
-      <MediaControlPanel dataset="Brain" setErrorMessage={setErrorMessage} />
+      <MediaControlPanel
+        datasetId={datasetId}
+        setErrorMessage={setErrorMessage}
+      />
       {isMeasuring && (
         <p className="absolute bottom-20 left-20 text-white bg-black/60 px-2 py-1 rounded text-sm">
           Click twice in any plane (XY, XZ, YZ) to display a measurement in µm.

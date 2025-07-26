@@ -36,7 +36,7 @@ export default function OTPVerifyPage() {
     setLoading(false);
 
     if (res.ok && result.success) {
-      router.push("/models");
+      router.push("/users_datasets");
     } else {
       setError(result.error || "Invalid OTP");
     }

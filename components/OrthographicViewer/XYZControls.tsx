@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Sliders } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 type Axis = "x" | "y" | "z";
@@ -34,7 +34,7 @@ const XYZControls: React.FC<XYZControlsProps> = ({
         title="Toggle Slice Controls"
       >
         <div className="relative">
-          <Sliders size={20} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
+          <SlidersHorizontal size={20} className="transition-transform duration-200 transform group-hover:scale-110 group-hover:-rotate-x-10 group-hover:-rotate-y-10" />
         </div>
       </button>
       {showPanel && (

@@ -35,30 +35,43 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { action, ...data } = await request.json();
+  try {
+    const contentType = request.headers.get("content-type") || "";
+    
+    if (contentType.includes("application/json")) {
+      const { action, ...data } = await request.json();
 
-  if (action === "institution") {
-    const result = await createInstitution(data as any);
-    return NextResponse.json({ success: !!result.insertedId });
-  } else if (action === "user") {
-    try {
-      const result = await createUser(data as any);
-      return NextResponse.json({ success: !!result.insertedId });
-    } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      if (action === "dataset") {
+        try {
+          const result = await createDataset(data);
+          return NextResponse.json({ success: true, id: result.insertedId.toString() });
+        } catch (error: any) {
+          console.error("Error creating dataset:", error);
+          return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+        }
+      } else if (action === "institution") {
+        const result = await createInstitution(data);
+        return NextResponse.json({ success: true, id: result.insertedId.toString() });
+      } else if (action === "user") {
+        try {
+          const result = await createUser(data);
+          return NextResponse.json({ success: true, id: result.insertedId.toString() });
+        } catch (error: any) {
+          console.error("Error creating user:", error);
+          return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+        }
+      } else if (action === "assign-datasets") {
+        const result = await updateUserDatasets(data.email, data.datasets);
+        return NextResponse.json({ success: !!result.modifiedCount });
+      }
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    } else {
+      return NextResponse.json({ error: "Unsupported Content-Type" }, { status: 400 });
     }
-  } else if (action === "dataset") {
-    try {
-      const result = await createDataset(data as any);
-      return NextResponse.json({ success: !!result.insertedId });
-    } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-    }
-  } else if (action === "assign-datasets") {
-    const result = await updateUserDatasets(data.email, data.datasets);
-    return NextResponse.json({ success: !!result.modifiedCount });
+  } catch (error: any) {
+    console.error("Error in POST /api/admin:", error);
+    return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 });
   }
-  return NextResponse.json({ success: false }, { status: 400 });
 }
 
 export async function PUT(request: Request) {

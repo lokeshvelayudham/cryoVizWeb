@@ -34,21 +34,48 @@ export default function ClientHome() {
   const { data: dataset, isLoading, error } = useQuery({
     queryKey: ["dataset", datasetId],
     queryFn: async () => {
-      if (!datasetId) return null; // Return null if no datasetId
+      if (!datasetId) {
+        console.log("No datasetId in query params, skipping fetch");
+        return null;
+      }
       const response = await fetch(`/api/admin?datasetId=${datasetId}`);
-      if (!response.ok) throw new Error("Failed to fetch dataset");
+      if (!response.ok) {
+        console.error("Failed to fetch dataset:", response.statusText);
+        throw new Error("Failed to fetch dataset");
+      }
       const result = await response.json();
-      // Check for error or return dataset
-      if (result.error) return null; // Handle "Dataset not found"
+      if (result.error) {
+        console.error("API returned error:", result.error);
+        return null; // Handle "Dataset not found"
+      }
+      console.log("Fetched dataset:", result.dataset);
       return result.dataset || null; // Return the dataset or null if not found
     },
     enabled: !!datasetId,
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading) return <div>Loading dataset...</div>;
-  if (error) return <div>Error loading dataset: {error.message}</div>;
-  if (!dataset) return <div>Dataset not found or no dataset ID provided</div>;
+  if (isLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <p>Loading dataset...</p>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <p>Error loading dataset: {error.message}</p>
+      </div>
+    );
+  }
+  if (!dataset || !dataset._id || !dataset.brightfieldBlobUrl) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <p>Dataset not found or invalid dataset ID provided</p>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -110,17 +137,31 @@ export default function ClientHome() {
           <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min">
             <div className="p-4">
               {activeTab === "orthographic" ? (
-                <Suspense fallback={<div>Loading...</div>}>
+                <Suspense fallback={<div>Loading Orthographic Viewer...</div>}>
                   <OrthographicViewer
                     brightfieldBlobUrl={dataset.brightfieldBlobUrl}
-                    datasetName={dataset.name}
+                    datasetId={dataset._id.toString()}
+                    brightfieldNumZ={dataset.brightfieldNumZ}
+                    brightfieldNumY={dataset.brightfieldNumY}
+                    brightfieldNumX={dataset.brightfieldNumX}
+                    fluorescentNumZ={dataset.fluorescentNumZ}
+                    fluorescentNumY={dataset.fluorescentNumY}
+                    fluorescentNumX={dataset.fluorescentNumX}
                   />
                 </Suspense>
               ) : (
-                <VolumeViewer 
-                brightfieldBlobUrl={dataset.brightfieldBlobUrl}
-                datasetName={dataset.name}
-                />
+                <Suspense fallback={<div>Loading Volume Viewer...</div>}>
+                  <VolumeViewer
+                    brightfieldBlobUrl={dataset.brightfieldBlobUrl}
+                    datasetId={dataset._id.toString()}
+                    brightfieldNumZ={dataset.brightfieldNumZ}
+                    brightfieldNumY={dataset.brightfieldNumY}
+                    brightfieldNumX={dataset.brightfieldNumX}
+                    fluorescentNumZ={dataset.fluorescentNumZ}
+                    fluorescentNumY={dataset.fluorescentNumY}
+                    fluorescentNumX={dataset.fluorescentNumX}
+                  />
+                </Suspense>
               )}
             </div>
           </div>

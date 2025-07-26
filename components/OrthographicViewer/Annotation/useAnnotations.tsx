@@ -11,13 +11,14 @@ export type Annotation = {
   instance: number;
   datetime: number;
   user: string;
-  dataset: string;
+  datasetId: string;
   status: string;
 };
 
 export default function useAnnotations(
   userEmail: string | null,
-  setErrorMessage: (message: string | null) => void
+  setErrorMessage: (message: string | null) => void,
+  datasetId: string
 ) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isAnnotating, setIsAnnotating] = useState(false);
@@ -31,8 +32,13 @@ export default function useAnnotations(
       setAnnotations([]);
       return;
     }
+    if (!datasetId) {
+      console.error("Dataset ID is required for fetching annotations");
+      setErrorMessage("Dataset ID is missing. Please ensure a dataset is selected.");
+      return;
+    }
     try {
-      const response = await fetch("/api/annotations", {
+      const response = await fetch(`/api/annotations?datasetId=${encodeURIComponent(datasetId)}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -53,16 +59,16 @@ export default function useAnnotations(
         instance: item.instance || 0,
         datetime: item.datetime || Date.now(),
         user: item.user || userEmail,
-        dataset: item.dataset || "Brain",
+        datasetId: item.datasetId || datasetId,
         status: item.status || "active",
       }));
       setAnnotations(fetchedAnnotations);
-      console.log("Annotations fetched from MongoDB:", fetchedAnnotations.map(a => ({ _id: a._id, id: a.id, user: a.user })));
+      console.log("Annotations fetched from MongoDB:", fetchedAnnotations.map(a => ({ _id: a._id, id: a.id, user: a.user, datasetId })));
     } catch (error) {
       console.error("Error fetching annotations from MongoDB:", error);
       setErrorMessage("Failed to load annotations. Please try again.");
     }
-  }, [userEmail, setErrorMessage]);
+  }, [userEmail, setErrorMessage, datasetId]);
 
   const saveAnnotationToMongoDB = useCallback(async (annotation: Annotation, updateOnlyPosition: boolean = false, retryCount: number = 0) => {
     if (!userEmail) {
@@ -95,7 +101,7 @@ export default function useAnnotations(
         x: annotation.x,
         y: annotation.y,
         datetime: annotation.datetime || Date.now(),
-        dataset: annotation.dataset || "Brain",
+        datasetId,
         status: annotation.status || "active",
       };
 
@@ -105,7 +111,8 @@ export default function useAnnotations(
         id: annotation.id, 
         user: userEmail, 
         retryCount,
-        text: annotation.text
+        text: annotation.text,
+        datasetId,
       });
 
       const response = await fetch("/api/annotations", {
@@ -124,21 +131,23 @@ export default function useAnnotations(
         console.log("POST response:", { _id: data._id, id: annotation.id });
         setAnnotations((prev) =>
           prev.map((ann) =>
-            ann.id === annotation.id ? { ...ann, _id: data._id, datetime: payload.datetime, user: userEmail } : ann
+            ann.id === annotation.id ? { ...ann, _id: data._id, datetime: payload.datetime, user: userEmail, datasetId } : ann
           )
         );
       }
       console.log(`Annotation ${updateOnlyPosition ? "updated" : "saved"} to MongoDB:`, { 
         _id: annotation._id, 
         id: annotation.id, 
-        user: userEmail 
+        user: userEmail,
+        datasetId,
       });
       setErrorMessage(null);
     } catch (error) {
       console.error(`Error ${updateOnlyPosition ? "updating" : "saving"} annotation to MongoDB:`, error, {
         _id: annotation._id,
         id: annotation.id,
-        user: userEmail
+        user: userEmail,
+        datasetId,
       });
       if (updateOnlyPosition && (error as Error).message.includes("Annotation not found") && retryCount < 3) {
         console.log("Refetching annotations due to not found error, retry:", retryCount + 1);
@@ -148,7 +157,7 @@ export default function useAnnotations(
         setErrorMessage(`Failed to ${updateOnlyPosition ? "update" : "save"} annotation: ${(error as Error).message}`);
       }
     }
-  }, [userEmail, setErrorMessage, fetchAnnotations]);
+  }, [userEmail, setErrorMessage, fetchAnnotations, datasetId]);
 
   const deleteAnnotationFromMongoDB = useCallback(async (annotationId: string) => {
     if (!userEmail) {
@@ -163,12 +172,12 @@ export default function useAnnotations(
         throw new Error("Annotation not found");
       }
 
-      console.log("Deleting annotation:", { _id: annotation._id, id: annotation.id, user: userEmail });
+      console.log("Deleting annotation:", { _id: annotation._id, id: annotation.id, user: userEmail, datasetId: annotation.datasetId });
 
       const response = await fetch("/api/annotations", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ _id: annotation._id }),
+        body: JSON.stringify({ _id: annotation._id, datasetId }),
       });
 
       if (!response.ok) {
@@ -177,13 +186,13 @@ export default function useAnnotations(
       }
 
       setAnnotations((prev) => prev.filter((ann) => ann._id !== annotationId && ann.id !== annotationId));
-      console.log("Annotation deleted from MongoDB:", { _id: annotation._id, id: annotation.id });
+      console.log("Annotation deleted from MongoDB:", { _id: annotation._id, id: annotation.id, datasetId });
       setErrorMessage(null);
     } catch (error) {
       console.error("Error deleting annotation from MongoDB:", error);
       setErrorMessage(`Failed to delete annotation: ${(error as Error).message}`);
     }
-  }, [userEmail, setErrorMessage, annotations]);
+  }, [userEmail, setErrorMessage, annotations, datasetId]);
 
   const handleEditAnnotation = useCallback((id: string, text: string) => {
     setEditingAnnotationId(id);
@@ -193,7 +202,7 @@ export default function useAnnotations(
   const handleSaveEdit = useCallback((id: string) => {
     const annotation = annotations.find((ann) => ann._id === id || ann.id === id);
     if (annotation) {
-      const updatedAnnotation = { ...annotation, text: editingText, datetime: Date.now() };
+      const updatedAnnotation = { ...annotation, text: editingText, datetime: Date.now(), datasetId };
       setAnnotations((prev) =>
         prev.map((ann) => (ann._id === id || ann.id === id ? updatedAnnotation : ann))
       );
@@ -208,7 +217,7 @@ export default function useAnnotations(
     }
     setEditingAnnotationId(null);
     setEditingText("");
-  }, [annotations, editingText, saveAnnotationToMongoDB, deleteAnnotationFromMongoDB]);
+  }, [annotations, editingText, saveAnnotationToMongoDB, deleteAnnotationFromMongoDB, datasetId]);
 
   useEffect(() => {
     if (userEmail) {

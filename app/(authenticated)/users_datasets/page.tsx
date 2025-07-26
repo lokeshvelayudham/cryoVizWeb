@@ -17,7 +17,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import Models from "@/components/models/Models";
+import UsersDatasets from "@/components/usersDatasets/UsersDatasets";
 
 export default async function UsersPage() {
   const session = await getServerSession(authOptions);
@@ -39,11 +39,11 @@ export default async function UsersPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/models">Dashboard</BreadcrumbLink>
+                  <BreadcrumbLink href="/datasets">Datasets</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Models</BreadcrumbPage>
+                  <BreadcrumbPage>Datasets</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -52,7 +52,7 @@ export default async function UsersPage() {
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min">
             <div className="p-4">
-              <Models />
+              <UsersDatasets />
             </div>
           </div>
         </div>

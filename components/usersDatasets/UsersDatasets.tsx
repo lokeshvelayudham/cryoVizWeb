@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Dataset, Institution } from "@/lib/models";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Dataset, Institution, User } from "@/lib/models";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -33,17 +35,50 @@ import {
 export default function UsersDatasets() {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
   const { data: adminData, isLoading, error } = useQuery({
-    queryKey: ["adminData"],
+    queryKey: ["adminData", session?.user?.email],
     queryFn: async () => {
+      if (status === "unauthenticated" || !session?.user?.email) {
+        throw new Error("Please log in to access datasets.");
+      }
+
       const response = await fetch("/api/admin");
       if (!response.ok) throw new Error("Failed to fetch admin data");
       const result = await response.json();
-      return result;
+
+      // Find the current user to get accessLevel and assignedDatasets
+      const currentUser = result.users.find((u: User) => u.email === session?.user?.email);
+      if (!currentUser) {
+        throw new Error("User not found");
+      }
+
+      // Filter datasets based on accessLevel
+      let filteredDatasets = result.datasets || [];
+      if (currentUser.accessLevel !== "admin") {
+        filteredDatasets = result.datasets.filter((dataset: Dataset) =>
+          currentUser.assignedDatasets.includes(dataset._id?.toString() || "")
+        );
+      }
+
+      return {
+        ...result,
+        datasets: filteredDatasets,
+        currentUser,
+      };
     },
     staleTime: 5 * 60 * 1000,
+    enabled: status === "authenticated", // Only run query if authenticated
   });
+
+  // Redirect unauthenticated users
+  React.useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/login");
+    }
+  }, [status, router]);
 
   const userDatasets = adminData?.datasets || [];
   const institutions = adminData?.institutions || [];
@@ -92,7 +127,6 @@ export default function UsersDatasets() {
       (inst: Institution) => inst._id?.toString() === dataset.institutionId?.toString()
     );
     const searchTerm = filterValue.toLowerCase();
-    console.log("Filter Value:", filterValue, "Institution:", institution?.name); // Debug log
     return (
       dataset.name?.toLowerCase().includes(searchTerm) ||
       dataset.description?.toLowerCase().includes(searchTerm) ||
@@ -118,11 +152,20 @@ export default function UsersDatasets() {
         pageSize: 6,
       },
     },
-    globalFilterFn: customFilterFn, // Apply custom filter function
+    globalFilterFn: customFilterFn,
   });
 
-  if (isLoading) return <div>Loading datasets...</div>;
-  if (error) return <div>Error loading datasets: {error.message}</div>;
+  if (status === "loading" || isLoading) {
+    return <div className="container mx-auto p-4">Loading datasets...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-4 text-red-500">
+        Error loading datasets: {error.message}
+      </div>
+    );
+  }
 
   // Determine if filtered results are empty
   const filteredRows = table.getRowModel().rows;
@@ -140,7 +183,7 @@ export default function UsersDatasets() {
         />
         <Select
           onValueChange={(value) => {
-            console.log("Selected Institution:", value); // Debug log
+            console.log("Selected Institution:", value);
             setGlobalFilter(value === "all" ? "" : value);
           }}
         >

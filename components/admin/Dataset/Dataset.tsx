@@ -52,9 +52,6 @@ import { useForm, FormProvider } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import DatasetFormPage1 from "@/components/admin/Dataset/DatasetFormPage1";
-import DatasetFormPage2 from "@/components/admin/Dataset/DatasetFormPage2";
-import DatasetFormPage3 from "@/components/admin/Dataset/DatasetFormPage3";
-import DatasetFormPage4 from "@/components/admin/Dataset/DatasetFormPage4";
 import { Institution, User, Dataset } from "@/lib/models";
 
 const uploadDatasetSchema = z.object({
@@ -64,25 +61,6 @@ const uploadDatasetSchema = z.object({
   brightfield: z.any().optional(),
   fluorescent: z.any().optional(),
   alpha: z.any().optional(),
-  voxels: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Voxels must be a valid number"),
-  thickness: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Thickness must be a valid number"),
-  pixelLengthUM: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Pixel Length UM must be a valid number"),
-  zSkip: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Z Skip must be a valid number"),
-  specimen: z.string().optional(),
-  pi: z.string().optional(),
-  dims3X: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims3X must be a valid number"),
-  dims3Y: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims3Y must be a valid number"),
-  dims3Z: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims3Z must be a valid number"),
-  dims2X: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims2X must be a valid number"),
-  dims2Y: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims2Y must be a valid number"),
-  dims2Z: z.number().optional().refine((val) => val === undefined || !isNaN(val), "Dims2Z must be a valid number"),
-  imageDimsX: z.number().optional().refine((val) => val === undefined || !isNaN(val), "ImageDimsX must be a valid number"),
-  imageDimsY: z.number().optional().refine((val) => val === undefined || !isNaN(val), "ImageDimsY must be a valid number"),
-  imageDimsZ: z.number().optional().refine((val) => val === undefined || !isNaN(val), "ImageDimsZ must be a valid number"),
-  liverTiff: z.any().optional(),
-  tumorTiff: z.any().optional(),
-  assignedUsers: z.array(z.string()).optional(),
-
 });
 
 type UploadDatasetForm = z.infer<typeof uploadDatasetSchema>;
@@ -97,7 +75,6 @@ export default function Datasets() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [showUsersOpen, setShowUsersOpen] = useState(false);
   const [selectedDatasetUsers, setSelectedDatasetUsers] = useState<User[]>([]);
   const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>([]);
@@ -107,41 +84,7 @@ export default function Datasets() {
     try {
       const response = await fetch("/api/admin");
       const data = await response.json();
-      const datasets = data.datasets || [];
-      // Log datasets to identify invalid values
-      datasets.forEach((dataset: Dataset, index: number) => {
-        if (dataset.voxels !== undefined && typeof dataset.voxels !== "number") {
-          console.warn(`Invalid voxels value in dataset ${index}:`, dataset);
-        }
-        if (dataset.thickness !== undefined && typeof dataset.thickness !== "number") {
-          console.warn(`Invalid thickness value in dataset ${index}:`, dataset);
-        }
-        if (dataset.pixelLengthUM !== undefined && typeof dataset.pixelLengthUM !== "number") {
-          console.warn(`Invalid pixelLengthUM value in dataset ${index}:`, dataset);
-        }
-        if (dataset.zSkip !== undefined && typeof dataset.zSkip !== "number") {
-          console.warn(`Invalid zSkip value in dataset ${index}:`, dataset);
-        }
-        if (dataset.brightfieldNumZ !== undefined && typeof dataset.brightfieldNumZ !== "number") {
-          console.warn(`Invalid brightfieldNumZ value in dataset ${index}:`, dataset);
-        }
-        if (dataset.brightfieldNumY !== undefined && typeof dataset.brightfieldNumY !== "number") {
-          console.warn(`Invalid brightfieldNumY value in dataset ${index}:`, dataset);
-        }
-        if (dataset.brightfieldNumX !== undefined && typeof dataset.brightfieldNumX !== "number") {
-          console.warn(`Invalid brightfieldNumX value in dataset ${index}:`, dataset);
-        }
-        if (dataset.fluorescentNumZ !== undefined && typeof dataset.fluorescentNumZ !== "number") {
-          console.warn(`Invalid fluorescentNumZ value in dataset ${index}:`, dataset);
-        }
-        if (dataset.fluorescentNumY !== undefined && typeof dataset.fluorescentNumY !== "number") {
-          console.warn(`Invalid fluorescentNumY value in dataset ${index}:`, dataset);
-        }
-        if (dataset.fluorescentNumX !== undefined && typeof dataset.fluorescentNumX !== "number") {
-          console.warn(`Invalid fluorescentNumX value in dataset ${index}:`, dataset);
-        }
-      });
-      setDatasets(datasets);
+      setDatasets(data.datasets || []);
       setInstitutions(data.institutions || []);
       setUsers(data.users || []);
     } catch (error) {
@@ -186,57 +129,6 @@ export default function Datasets() {
         const institution = institutions.find((inst) => inst._id?.toString() === row.original.institutionId?.toString());
         return institution ? institution.name : "N/A";
       },
-    },
-    {
-      accessorKey: "voxels",
-      header: "Voxels",
-      cell: ({ row }) => {
-        const voxels = row.original.voxels;
-        return typeof voxels === "number" && !isNaN(voxels) ? voxels.toFixed(3) : "N/A";
-      },
-    },
-    {
-      accessorKey: "thickness",
-      header: "Thickness",
-      cell: ({ row }) => {
-        const thickness = row.original.thickness;
-        return typeof thickness === "number" && !isNaN(thickness) ? thickness.toFixed(3) : "N/A";
-      },
-    },
-    {
-      accessorKey: "pixelLengthUM",
-      header: "Pixel Length (UM)",
-      cell: ({ row }) => {
-        const pixelLengthUM = row.original.pixelLengthUM;
-        return typeof pixelLengthUM === "number" && !isNaN(pixelLengthUM) ? pixelLengthUM.toFixed(1) : "N/A";
-      },
-    },
-    {
-      accessorKey: "zSkip",
-      header: "Z Skip",
-      cell: ({ row }) => {
-        const zSkip = row.original.zSkip;
-        return typeof zSkip === "number" && !isNaN(zSkip) ? zSkip.toString() : "N/A";
-      },
-    },
-    {
-      accessorKey: "specimen",
-      header: "Specimen",
-      cell: ({ row }) => row.original.specimen || "N/A",
-    },
-    {
-      accessorKey: "pi",
-      header: "PI",
-      cell: ({ row }) => row.original.pi || "N/A",
-    },
-    {
-      accessorKey: "imageDims",
-      header: "Image Dims",
-      cell: ({ row }) =>
-        row.original.imageDims && typeof row.original.imageDims.x === "number" &&
-        typeof row.original.imageDims.y === "number" && typeof row.original.imageDims.z === "number"
-          ? `${row.original.imageDims.x}x${row.original.imageDims.y}x${row.original.imageDims.z}`
-          : "N/A",
     },
     {
       id: "actions",
@@ -298,24 +190,6 @@ export default function Datasets() {
       brightfield: null,
       fluorescent: null,
       alpha: null,
-      voxels: undefined,
-      thickness: undefined,
-      pixelLengthUM: undefined,
-      zSkip: undefined,
-      specimen: "",
-      pi: "",
-      dims3X: undefined,
-      dims3Y: undefined,
-      dims3Z: undefined,
-      dims2X: undefined,
-      dims2Y: undefined,
-      dims2Z: undefined,
-      imageDimsX: undefined,
-      imageDimsY: undefined,
-      imageDimsZ: undefined,
-      liverTiff: null,
-      tumorTiff: null,
-      assignedUsers: [],
     },
   });
 
@@ -330,27 +204,8 @@ export default function Datasets() {
       brightfield: null,
       fluorescent: null,
       alpha: null,
-      voxels: typeof dataset.voxels === "number" && !isNaN(dataset.voxels) ? dataset.voxels : undefined,
-      thickness: typeof dataset.thickness === "number" && !isNaN(dataset.thickness) ? dataset.thickness : undefined,
-      pixelLengthUM: typeof dataset.pixelLengthUM === "number" && !isNaN(dataset.pixelLengthUM) ? dataset.pixelLengthUM : undefined,
-      zSkip: typeof dataset.zSkip === "number" && !isNaN(dataset.zSkip) ? dataset.zSkip : undefined,
-      specimen: dataset.specimen || "",
-      pi: dataset.pi || "",
-      dims3X: typeof dataset.dims3?.x === "number" && !isNaN(dataset.dims3.x) ? dataset.dims3.x : undefined,
-      dims3Y: typeof dataset.dims3?.y === "number" && !isNaN(dataset.dims3.y) ? dataset.dims3.y : undefined,
-      dims3Z: typeof dataset.dims3?.z === "number" && !isNaN(dataset.dims3.z) ? dataset.dims3.z : undefined,
-      dims2X: typeof dataset.dims2?.x === "number" && !isNaN(dataset.dims2.x) ? dataset.dims2.x : undefined,
-      dims2Y: typeof dataset.dims2?.y === "number" && !isNaN(dataset.dims2.y) ? dataset.dims2.y : undefined,
-      dims2Z: typeof dataset.dims2?.z === "number" && !isNaN(dataset.dims2.z) ? dataset.dims2.z : undefined,
-      imageDimsX: typeof dataset.imageDims?.x === "number" && !isNaN(dataset.imageDims.x) ? dataset.imageDims.x : undefined,
-      imageDimsY: typeof dataset.imageDims?.y === "number" && !isNaN(dataset.imageDims.y) ? dataset.imageDims.y : undefined,
-      imageDimsZ: typeof dataset.imageDims?.z === "number" && !isNaN(dataset.imageDims.z) ? dataset.imageDims.z : undefined,
-      liverTiff: null,
-      tumorTiff: null,
-      assignedUsers: dataset.assignedUsers || [],
     });
     setIsUploadOpen(true);
-    setCurrentPage(1);
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -376,6 +231,7 @@ export default function Datasets() {
   };
 
   const handleShowUsers = (dataset: Dataset) => {
+    setSelectedDataset(dataset); // Ensure selectedDataset is set
     const userIds = dataset.assignedUsers || [];
     const associatedUsers = users.filter((user) => userIds.includes(user._id?.toString() || ""));
     setSelectedDatasetUsers(associatedUsers);
@@ -383,34 +239,83 @@ export default function Datasets() {
   };
 
   const handleRemoveUser = async (userId: string, datasetId: string) => {
+    if (!userId || !datasetId) {
+      alert("Invalid user or dataset ID");
+      return;
+    }
+
     if (confirm("Are you sure you want to remove this user from the dataset?")) {
       try {
-        const response = await fetch("/api/admin", {
+        // Step 1: Ensure dataset exists by fetching latest data
+        await fetchData();
+        const dataset = datasets.find((d) => d._id?.toString() === datasetId);
+        if (!dataset) {
+          // Optional: Fetch dataset directly from server if not found in state
+          const response = await fetch(`/api/admin?datasetId=${datasetId}`);
+          if (!response.ok) {
+            throw new Error("Dataset not found in database");
+          }
+          const data = await response.json();
+          if (!data.dataset) {
+            throw new Error("Dataset not found in database");
+          }
+        }
+
+        // Step 2: Update the user's assignedDatasets to remove the datasetId
+        const user = users.find((u) => u._id?.toString() === userId);
+        if (!user || !user.email) {
+          throw new Error("User or user email not found");
+        }
+
+        const updatedUserDatasets = (user.assignedDatasets || []).filter((id) => id !== datasetId);
+        const userResponse = await fetch("/api/admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "assign-datasets",
-            email: users.find((u) => u._id?.toString() === userId)?.email || "",
-            datasets: [datasetId],
+            email: user.email,
+            datasets: updatedUserDatasets,
           }),
         });
-        if (response.ok) {
-          fetchData();
-          const updatedDataset = datasets.find((d) => d._id?.toString() === datasetId);
-          if (updatedDataset) {
-            const updatedUsers = users.filter((user) =>
-              (updatedDataset.assignedUsers || []).includes(user._id?.toString() || "")
-            );
-            setSelectedDatasetUsers(updatedUsers);
-          }
+
+        if (!userResponse.ok) {
+          const errorData = await userResponse.json();
+          console.error("Failed to update user datasets:", errorData);
+          throw new Error(errorData.error || "Failed to update user datasets");
+        }
+
+        // Step 3: Update the dataset's assignedUsers to remove the userId
+        const updatedAssignedUsers = (dataset?.assignedUsers || []).filter((id) => id !== userId);
+        const datasetResponse = await fetch("/api/admin", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "update-dataset",
+            _id: datasetId,
+            assignedUsers: updatedAssignedUsers,
+          }),
+        });
+
+        if (!datasetResponse.ok) {
+          const errorData = await datasetResponse.json();
+          console.error("Failed to update dataset assigned users:", errorData);
+          throw new Error(errorData.error || "Failed to update dataset assigned users");
+        }
+
+        // Refresh data and update UI
+        await fetchData();
+        const updatedDataset = datasets.find((d) => d._id?.toString() === datasetId);
+        if (updatedDataset) {
+          const updatedUsers = users.filter((user) =>
+            (updatedDataset.assignedUsers || []).includes(user._id?.toString() || "")
+          );
+          setSelectedDatasetUsers(updatedUsers);
         } else {
-          const errorData = await response.json();
-          console.error("Failed to remove user:", errorData);
-          alert(errorData.error || "Failed to remove user from dataset");
+          setSelectedDatasetUsers([]);
         }
       } catch (error) {
         console.error("Error removing user:", error);
-        alert("Error removing user from dataset");
+        alert(`Error removing user from dataset: ${error}`);
       }
     }
   };
@@ -422,11 +327,15 @@ export default function Datasets() {
   };
 
   const handleAssignUsersSubmit = async () => {
-    if (!selectedDataset || !selectedDataset._id) return;
+    if (!selectedDataset || !selectedDataset._id) {
+      alert("No dataset selected");
+      return;
+    }
 
     try {
-      const response = await fetch("/api/admin", {
-        method: "POST",
+      // Step 1: Update the dataset's assignedUsers
+      const datasetResponse = await fetch("/api/admin", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "update-dataset",
@@ -434,17 +343,60 @@ export default function Datasets() {
           assignedUsers: selectedAssignedUsers,
         }),
       });
-      const result = await response.json();
-      if (response.ok) {
-        fetchData();
-        setIsAssignUsersOpen(false);
-      } else {
-        console.error("Failed to assign users:", result.error);
-        alert(result.error || "Failed to assign users to dataset");
+
+      if (!datasetResponse.ok) {
+        const errorData = await datasetResponse.json();
+        console.error("Failed to assign users to dataset:", errorData);
+        throw new Error(errorData.error || "Failed to assign users to dataset");
       }
+
+      // Step 2: Update each user's assignedDatasets
+      const updatePromises = users.map(async (user) => {
+        const shouldBeAssigned = selectedAssignedUsers.includes(user._id?.toString() || "");
+        const currentDatasets = user.assignedDatasets || [];
+        const isCurrentlyAssigned = currentDatasets.includes(selectedDataset._id.toString());
+
+        if (shouldBeAssigned && !isCurrentlyAssigned) {
+          // Add datasetId to user's assignedDatasets
+          return fetch("/api/admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "assign-datasets",
+              email: user.email,
+              datasets: [...currentDatasets, selectedDataset._id.toString()],
+            }),
+          });
+        } else if (!shouldBeAssigned && isCurrentlyAssigned) {
+          // Remove datasetId from user's assignedDatasets
+          return fetch("/api/admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "assign-datasets",
+              email: user.email,
+              datasets: currentDatasets.filter((id) => id !== selectedDataset._id.toString()),
+            }),
+          });
+        }
+        return Promise.resolve();
+      });
+
+      const responses = await Promise.all(updatePromises);
+      for (const response of responses) {
+        if (response && !response.ok) {
+          const errorData = await response.json();
+          console.error("Failed to update user datasets:", errorData);
+          throw new Error(errorData.error || "Failed to update user datasets");
+        }
+      }
+
+      // Refresh data and close dialog
+      await fetchData();
+      setIsAssignUsersOpen(false);
     } catch (error) {
       console.error("Error assigning users:", error);
-      alert("Error assigning users to dataset");
+      alert(`Error assigning users to dataset: ${error}`);
     }
   };
 
@@ -457,26 +409,6 @@ export default function Datasets() {
       if (data.brightfield) formData.append("brightfield", data.brightfield[0]);
       if (data.fluorescent) formData.append("fluorescent", data.fluorescent[0]);
       if (data.alpha) formData.append("alpha", data.alpha[0]);
-      if (data.liverTiff) formData.append("liverTiff", data.liverTiff[0]);
-      if (data.tumorTiff) formData.append("tumorTiff", data.tumorTiff[0]);
-      formData.append("voxels", data.voxels?.toString() || "");
-      formData.append("thickness", data.thickness?.toString() || "");
-      formData.append("pixelLengthUM", data.pixelLengthUM?.toString() || "");
-      formData.append("zSkip", data.zSkip?.toString() || "");
-      formData.append("specimen", data.specimen || "");
-      formData.append("pi", data.pi || "");
-      formData.append("dims3X", data.dims3X?.toString() || "");
-      formData.append("dims3Y", data.dims3Y?.toString() || "");
-      formData.append("dims3Z", data.dims3Z?.toString() || "");
-      formData.append("dims2X", data.dims2X?.toString() || "");
-      formData.append("dims2Y", data.dims2Y?.toString() || "");
-      formData.append("dims2Z", data.dims2Z?.toString() || "");
-      formData.append("imageDimsX", data.imageDimsX?.toString() || "");
-      formData.append("imageDimsY", data.imageDimsY?.toString() || "");
-      formData.append("imageDimsZ", data.imageDimsZ?.toString() || "");
-      if (data.assignedUsers) {
-        formData.append("assignedUsers", JSON.stringify(data.assignedUsers));
-      }
 
       const response = await fetch("/api/upload-dataset", {
         method: "POST",
@@ -494,7 +426,6 @@ export default function Datasets() {
         fetchData();
         setIsUploadOpen(false);
         reset();
-        setCurrentPage(1);
       } else {
         console.error("Failed to upload dataset:", result.error);
         alert(result.error || "Failed to upload dataset");
@@ -502,21 +433,6 @@ export default function Datasets() {
     } catch (error: any) {
       console.error("Error uploading dataset:", error.message);
       alert(`Error uploading dataset: ${error.message}`);
-    }
-  };
-
-  const renderFormPage = () => {
-    switch (currentPage) {
-      case 1:
-        return <DatasetFormPage1 institutions={institutions} onNext={() => setCurrentPage(2)} />;
-      case 2:
-        return <DatasetFormPage2 onNext={() => setCurrentPage(3)} onPrev={() => setCurrentPage(1)} />;
-      case 3:
-        return <DatasetFormPage3 onNext={() => setCurrentPage(4)} onPrev={() => setCurrentPage(2)} />;
-      case 4:
-        return <DatasetFormPage4 institutions={institutions} users={users} onPrev={() => setCurrentPage(3)} onSubmit={handleSubmit(onUploadSubmit)} />;
-      default:
-        return null;
     }
   };
 
@@ -543,7 +459,7 @@ export default function Datasets() {
                 <DialogTitle>{selectedDataset ? "Edit Dataset" : "New Dataset"}</DialogTitle>
               </DialogHeader>
               <FormProvider {...methods}>
-                {renderFormPage()}
+                <DatasetFormPage1 institutions={institutions} onSubmit={onUploadSubmit} />
               </FormProvider>
             </DialogContent>
           </Dialog>
@@ -689,7 +605,6 @@ export default function Datasets() {
             <div>
               <label className="block text-sm font-medium text-gray-700">Select Users</label>
               <Select
-                // multiple
                 value={selectedAssignedUsers.join(',')}
                 onValueChange={(values) => setSelectedAssignedUsers(values.split(',') as string[])}
               >

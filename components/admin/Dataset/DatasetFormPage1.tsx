@@ -13,14 +13,14 @@ import { Institution } from "@/lib/models";
 
 interface DatasetFormPage1Props {
   institutions: Institution[];
-  onNext: () => void;
+  onSubmit: (data: any) => void;
 }
 
-export default function DatasetFormPage1({ institutions, onNext }: DatasetFormPage1Props) {
-  const { control } = useFormContext();
+export default function DatasetFormPage1({ institutions, onSubmit }: DatasetFormPage1Props) {
+  const { control, handleSubmit } = useFormContext();
 
   return (
-    <form className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="text-sm font-medium">Name</label>
@@ -102,7 +102,7 @@ export default function DatasetFormPage1({ institutions, onNext }: DatasetFormPa
           />
         </div>
       </div>
-      <Button type="button" onClick={onNext}>Next</Button>
+      <Button type="submit">Submit</Button>
     </form>
   );
 }

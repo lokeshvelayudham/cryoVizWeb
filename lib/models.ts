@@ -252,24 +252,24 @@ export async function createDataset(dataset: Omit<Dataset, "_id" | "createdAt">)
       zSkip: typeof dataset.zSkip === "number" && !isNaN(dataset.zSkip) ? dataset.zSkip : undefined,
       dims3: dataset.dims3
         ? {
-            x: typeof dataset.dims3.x === "number" && !isNaN(dataset.dims3.x) ? dataset.dims3.x : undefined,
-            y: typeof dataset.dims3.y === "number" && !isNaN(dataset.dims3.y) ? dataset.dims3.y : undefined,
-            z: typeof dataset.dims3.z === "number" && !isNaN(dataset.dims3.z) ? dataset.dims3.z : undefined,
-          }
+          x: typeof dataset.dims3.x === "number" && !isNaN(dataset.dims3.x) ? dataset.dims3.x : undefined,
+          y: typeof dataset.dims3.y === "number" && !isNaN(dataset.dims3.y) ? dataset.dims3.y : undefined,
+          z: typeof dataset.dims3.z === "number" && !isNaN(dataset.dims3.z) ? dataset.dims3.z : undefined,
+        }
         : undefined,
       dims2: dataset.dims2
         ? {
-            x: typeof dataset.dims2.x === "number" && !isNaN(dataset.dims2.x) ? dataset.dims2.x : undefined,
-            y: typeof dataset.dims2.y === "number" && !isNaN(dataset.dims2.y) ? dataset.dims2.y : undefined,
-            z: typeof dataset.dims2.z === "number" && !isNaN(dataset.dims2.z) ? dataset.dims2.z : undefined,
-          }
+          x: typeof dataset.dims2.x === "number" && !isNaN(dataset.dims2.x) ? dataset.dims2.x : undefined,
+          y: typeof dataset.dims2.y === "number" && !isNaN(dataset.dims2.y) ? dataset.dims2.y : undefined,
+          z: typeof dataset.dims2.z === "number" && !isNaN(dataset.dims2.z) ? dataset.dims2.z : undefined,
+        }
         : undefined,
       imageDims: dataset.imageDims
         ? {
-            x: typeof dataset.imageDims.x === "number" && !isNaN(dataset.imageDims.x) ? dataset.imageDims.x : undefined,
-            y: typeof dataset.imageDims.y === "number" && !isNaN(dataset.imageDims.y) ? dataset.imageDims.y : undefined,
-            z: typeof dataset.imageDims.z === "number" && !isNaN(dataset.imageDims.z) ? dataset.imageDims.z : undefined,
-          }
+          x: typeof dataset.imageDims.x === "number" && !isNaN(dataset.imageDims.x) ? dataset.imageDims.x : undefined,
+          y: typeof dataset.imageDims.y === "number" && !isNaN(dataset.imageDims.y) ? dataset.imageDims.y : undefined,
+          z: typeof dataset.imageDims.z === "number" && !isNaN(dataset.imageDims.z) ? dataset.imageDims.z : undefined,
+        }
         : undefined,
       brightfieldNumZ: typeof dataset.brightfieldNumZ === "number" && !isNaN(dataset.brightfieldNumZ) ? dataset.brightfieldNumZ : undefined,
       brightfieldNumY: typeof dataset.brightfieldNumY === "number" && !isNaN(dataset.brightfieldNumY) ? dataset.brightfieldNumY : undefined,

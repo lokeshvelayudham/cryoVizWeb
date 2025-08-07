@@ -79,8 +79,12 @@ export default function Datasets() {
   const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
   const [isMediaManagementOpen, setIsMediaManagementOpen] = useState(false);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>([]);
-  const [selectedInstitutions, setSelectedInstitutions] = useState<string[]>([]);
+  const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>(
+    []
+  );
+  const [selectedInstitutions, setSelectedInstitutions] = useState<string[]>(
+    []
+  );
 
   const fetchData = async () => {
     setLoading(true);
@@ -140,7 +144,10 @@ export default function Datasets() {
       accessorKey: "institutionId",
       header: "Institution",
       cell: ({ row }) => {
-        const institution = institutions.find((inst) => inst._id?.toString() === row.original.institutionId?.toString());
+        const institution = institutions.find(
+          (inst) =>
+            inst._id?.toString() === row.original.institutionId?.toString()
+        );
         return institution ? institution.name : "N/A";
       },
     },
@@ -166,7 +173,11 @@ export default function Datasets() {
               <DropdownMenuItem onClick={() => handleEdit(dataset)}>
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDelete(dataset._id?.toString() || "", dataset.name)}>
+              <DropdownMenuItem
+                onClick={() =>
+                  handleDelete(dataset._id?.toString() || "", dataset.name)
+                }
+              >
                 Delete
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleManageUsers(dataset)}>
@@ -207,14 +218,17 @@ export default function Datasets() {
     },
   });
 
-  const { reset: resetDataset, handleSubmit: handleDatasetSubmit } = datasetMethods;
+  const { reset: resetDataset, handleSubmit: handleDatasetSubmit } =
+    datasetMethods;
 
   const handleEdit = (dataset: Dataset) => {
     setSelectedDataset(dataset);
     resetDataset({
       name: dataset.name,
       description: dataset.description || "",
-      institutionId: dataset.institutionId ? dataset.institutionId.toString() : "",
+      institutionId: dataset.institutionId
+        ? dataset.institutionId.toString()
+        : "",
       brightfield: null,
       fluorescent: null,
       alpha: null,
@@ -262,7 +276,9 @@ export default function Datasets() {
       return;
     }
 
-    if (confirm("Are you sure you want to remove this user from the dataset?")) {
+    if (
+      confirm("Are you sure you want to remove this user from the dataset?")
+    ) {
       try {
         await fetchData();
         const dataset = datasets.find((d) => d._id?.toString() === datasetId);
@@ -282,7 +298,9 @@ export default function Datasets() {
           throw new Error("User or user email not found");
         }
 
-        const updatedUserDatasets = (user.assignedDatasets || []).filter((id) => id !== datasetId);
+        const updatedUserDatasets = (user.assignedDatasets || []).filter(
+          (id) => id !== datasetId
+        );
         const userResponse = await fetch("/api/admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -299,7 +317,9 @@ export default function Datasets() {
           throw new Error(errorData.error || "Failed to update user datasets");
         }
 
-        const updatedAssignedUsers = (dataset?.assignedUsers || []).filter((id) => id !== userId);
+        const updatedAssignedUsers = (dataset?.assignedUsers || []).filter(
+          (id) => id !== userId
+        );
         const datasetResponse = await fetch("/api/admin", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -313,7 +333,9 @@ export default function Datasets() {
         if (!datasetResponse.ok) {
           const errorData = await datasetResponse.json();
           console.error("Failed to update dataset assigned users:", errorData);
-          throw new Error(errorData.error || "Failed to update dataset assigned users");
+          throw new Error(
+            errorData.error || "Failed to update dataset assigned users"
+          );
         }
 
         await fetchData();
@@ -349,9 +371,13 @@ export default function Datasets() {
       }
 
       const updatePromises = users.map(async (user) => {
-        const shouldBeAssigned = selectedAssignedUsers.includes(user._id?.toString() || "");
+        const shouldBeAssigned = selectedAssignedUsers.includes(
+          user._id?.toString() || ""
+        );
         const currentDatasets = user.assignedDatasets || [];
-        const isCurrentlyAssigned = currentDatasets.includes(selectedDataset._id?.toString() || "");
+        const isCurrentlyAssigned = currentDatasets.includes(
+          selectedDataset._id?.toString() || ""
+        );
 
         if (shouldBeAssigned && !isCurrentlyAssigned) {
           return fetch("/api/admin", {
@@ -360,7 +386,10 @@ export default function Datasets() {
             body: JSON.stringify({
               action: "assign-datasets",
               email: user.email,
-              datasets: [...currentDatasets, selectedDataset._id?.toString() || ""],
+              datasets: [
+                ...currentDatasets,
+                selectedDataset._id?.toString() || "",
+              ],
             }),
           });
         } else if (!shouldBeAssigned && isCurrentlyAssigned) {
@@ -370,7 +399,9 @@ export default function Datasets() {
             body: JSON.stringify({
               action: "assign-datasets",
               email: user.email,
-              datasets: currentDatasets.filter((id) => id !== selectedDataset._id.toString()),
+              datasets: currentDatasets.filter(
+                (id) => id !== selectedDataset._id.toString()
+              ),
             }),
           });
         }
@@ -412,7 +443,9 @@ export default function Datasets() {
       if (!response.ok) {
         const errorData = await response.text();
         console.error("Server response error:", errorData);
-        throw new Error(`Server error: ${response.status} ${response.statusText} - ${errorData}`);
+        throw new Error(
+          `Server error: ${response.status} ${response.statusText} - ${errorData}`
+        );
       }
 
       const result = await response.json();
@@ -458,10 +491,15 @@ export default function Datasets() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{selectedDataset ? "Edit Dataset" : "New Dataset"}</DialogTitle>
+                <DialogTitle>
+                  {selectedDataset ? "Edit Dataset" : "New Dataset"}
+                </DialogTitle>
               </DialogHeader>
               <FormProvider {...datasetMethods}>
-                <DatasetFormPage1 institutions={institutions} onSubmit={onUploadSubmit} />
+                <DatasetFormPage1
+                  institutions={institutions}
+                  onSubmit={onUploadSubmit}
+                />
               </FormProvider>
             </DialogContent>
           </Dialog>
@@ -474,7 +512,10 @@ export default function Datasets() {
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
-                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -486,7 +527,10 @@ export default function Datasets() {
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -519,7 +563,8 @@ export default function Datasets() {
           Next
         </Button>
         <span className="text-sm">
-          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          Page {table.getState().pagination.pageIndex + 1} of{" "}
+          {table.getPageCount()}
         </span>
         <Select
           value={table.getState().pagination.pageSize.toString()}

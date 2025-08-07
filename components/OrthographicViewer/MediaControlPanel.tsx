@@ -19,6 +19,7 @@ interface MediaControlPanelProps {
 export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaControlPanelProps) {
   const { data: session } = useSession();
   const userEmail = session?.user?.email || null;
+  const userId = session?.user?.id || userEmail; // Use user.id if available, fallback to email
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
@@ -30,14 +31,21 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
   const previewDragRef = useRef<HTMLDivElement>(null);
 
   const fetchFiles = async () => {
-    if (!userEmail) return;
+    if (!userEmail) {
+      setErrorMessage("User not authenticated");
+      return;
+    }
     try {
       const response = await fetch(`/api/media?dataset=${datasetId}`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": userId, // Pass userId in header for API to use
+        },
       });
       if (!response.ok) throw new Error("Failed to fetch files");
       const data = await response.json();
+      console.log("API Response:", data); // Debug: Log the full response
       setMediaFiles(data.files || []);
       setSelectedFileIds([]); // Reset selection on fetch
     } catch (error: any) {
@@ -50,6 +58,9 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
     try {
       const response = await fetch(file.url, {
         method: "GET",
+        headers: {
+          "X-User-Id": userId, // Add user ID for authenticated access if required
+        },
       });
       if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
       const blob = await response.blob();
@@ -62,7 +73,7 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error: any) {
-      console.error("Error downloading file:", error.message);
+      console.error("Error downloading file:", error.message, "URL:", file.url);
       setErrorMessage(`Failed to download file: ${file.name}`);
     }
   };
@@ -83,22 +94,12 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
     }
   };
 
-  const getContentType = (filename: string): string => {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "txt": return "text/plain";
-      case "mp4": return "video/mp4";
-      case "jpeg":
-      case "jpg": return "image/jpeg";
-      case "png": return "image/png";
-      case "pdf": return "application/pdf";
-      case "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      default: return "application/octet-stream";
-    }
+  const getFileExtension = (filename: string): string => {
+    return filename.split(".").pop()?.toLowerCase() || "";
   };
 
   const renderPreview = (file: MediaFile) => {
-    const ext = file.tag.toLowerCase();
+    const ext = getFileExtension(file.name); // Use file name extension if tag is unreliable
     if (ext === "txt") {
       return <iframe src={file.url} className="w-full h-64 border-0" />;
     } else if (ext === "mp4") {
@@ -108,10 +109,17 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
           Your browser does not support the video tag.
         </video>
       );
-    } else if (["jpeg", "png"].includes(ext)) {
+    } else if (["jpeg", "jpg", "png"].includes(ext)) {
       return <img src={file.url} alt={file.name} className="w-full h-auto max-h-64" />;
     } else if (ext === "pdf") {
-      return <iframe src={file.url} className="w-full h-64 border-0" />;
+      return (
+        <iframe
+          src={`${file.url}#toolbar=0&navpanes=0`} // Hide toolbar and navigation panes
+          className="w-full h-64 border-0"
+          title={`Preview of ${file.name}`}
+          onError={() => console.log(`Failed to load preview for ${file.name}, URL: ${file.url}`)} // Debug error
+        />
+      );
     } else if (ext === "docx") {
       return <p className="text-sm text-gray-500 dark:text-gray-400">Preview not available for .docx files. Please download to view.</p>;
     }
@@ -279,6 +287,7 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
                         <td
                           className="px-2 py-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 truncate"
                           onClick={() => {
+                            console.log("Previewing file:", file); // Debug: Log file object
                             setPreviewFile(file);
                             setIsListModalOpen(false);
                           }}

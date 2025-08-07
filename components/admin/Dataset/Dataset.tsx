@@ -53,6 +53,9 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import DatasetFormPage1 from "@/components/admin/Dataset/DatasetFormPage1";
 import { Institution, User, Dataset } from "@/lib/models";
+import { Checkbox } from "@/components/ui/checkbox";
+import ManageUsersDialog from "./ManageUsersDialog";
+import MediaManagementDialog from "./MediaManagementDialog";
 
 const uploadDatasetSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -73,11 +76,11 @@ export default function Datasets() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false);
+  const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
+  const [isMediaManagementOpen, setIsMediaManagementOpen] = useState(false);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [showUsersOpen, setShowUsersOpen] = useState(false);
-  const [selectedDatasetUsers, setSelectedDatasetUsers] = useState<User[]>([]);
   const [selectedAssignedUsers, setSelectedAssignedUsers] = useState<string[]>([]);
+  const [selectedInstitutions, setSelectedInstitutions] = useState<string[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -91,6 +94,17 @@ export default function Datasets() {
       console.error("Failed to fetch data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMedia = async (datasetId: string) => {
+    try {
+      const response = await fetch(`/api/media?dataset=${datasetId}`);
+      if (!response.ok) throw new Error("Failed to fetch media");
+      const data = await response.json();
+      // Note: Media state is now managed by MediaManagementDialog
+    } catch (error) {
+      console.error("Error fetching media:", error);
     }
   };
 
@@ -155,11 +169,11 @@ export default function Datasets() {
               <DropdownMenuItem onClick={() => handleDelete(dataset._id?.toString() || "", dataset.name)}>
                 Delete
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShowUsers(dataset)}>
-                Show Users
+              <DropdownMenuItem onClick={() => handleManageUsers(dataset)}>
+                Manage Users
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAssignUsers(dataset)}>
-                Assign Users
+              <DropdownMenuItem onClick={() => handleMediaManagement(dataset)}>
+                Manage Media
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -181,7 +195,7 @@ export default function Datasets() {
     initialState: { pagination: { pageSize: 10 } },
   });
 
-  const methods = useForm<UploadDatasetForm>({
+  const datasetMethods = useForm<UploadDatasetForm>({
     resolver: zodResolver(uploadDatasetSchema),
     defaultValues: {
       name: "",
@@ -193,11 +207,11 @@ export default function Datasets() {
     },
   });
 
-  const { reset, handleSubmit } = methods;
+  const { reset: resetDataset, handleSubmit: handleDatasetSubmit } = datasetMethods;
 
   const handleEdit = (dataset: Dataset) => {
     setSelectedDataset(dataset);
-    reset({
+    resetDataset({
       name: dataset.name,
       description: dataset.description || "",
       institutionId: dataset.institutionId ? dataset.institutionId.toString() : "",
@@ -230,12 +244,16 @@ export default function Datasets() {
     }
   };
 
-  const handleShowUsers = (dataset: Dataset) => {
-    setSelectedDataset(dataset); // Ensure selectedDataset is set
-    const userIds = dataset.assignedUsers || [];
-    const associatedUsers = users.filter((user) => userIds.includes(user._id?.toString() || ""));
-    setSelectedDatasetUsers(associatedUsers);
-    setShowUsersOpen(true);
+  const handleManageUsers = (dataset: Dataset) => {
+    setSelectedDataset(dataset);
+    setSelectedAssignedUsers(dataset.assignedUsers || []);
+    setSelectedInstitutions([dataset.institutionId?.toString() || ""]);
+    setIsManageUsersOpen(true);
+  };
+
+  const handleMediaManagement = async (dataset: Dataset) => {
+    setSelectedDataset(dataset);
+    setIsMediaManagementOpen(true);
   };
 
   const handleRemoveUser = async (userId: string, datasetId: string) => {
@@ -246,11 +264,9 @@ export default function Datasets() {
 
     if (confirm("Are you sure you want to remove this user from the dataset?")) {
       try {
-        // Step 1: Ensure dataset exists by fetching latest data
         await fetchData();
         const dataset = datasets.find((d) => d._id?.toString() === datasetId);
         if (!dataset) {
-          // Optional: Fetch dataset directly from server if not found in state
           const response = await fetch(`/api/admin?datasetId=${datasetId}`);
           if (!response.ok) {
             throw new Error("Dataset not found in database");
@@ -261,7 +277,6 @@ export default function Datasets() {
           }
         }
 
-        // Step 2: Update the user's assignedDatasets to remove the datasetId
         const user = users.find((u) => u._id?.toString() === userId);
         if (!user || !user.email) {
           throw new Error("User or user email not found");
@@ -284,7 +299,6 @@ export default function Datasets() {
           throw new Error(errorData.error || "Failed to update user datasets");
         }
 
-        // Step 3: Update the dataset's assignedUsers to remove the userId
         const updatedAssignedUsers = (dataset?.assignedUsers || []).filter((id) => id !== userId);
         const datasetResponse = await fetch("/api/admin", {
           method: "PUT",
@@ -302,28 +316,13 @@ export default function Datasets() {
           throw new Error(errorData.error || "Failed to update dataset assigned users");
         }
 
-        // Refresh data and update UI
         await fetchData();
-        const updatedDataset = datasets.find((d) => d._id?.toString() === datasetId);
-        if (updatedDataset) {
-          const updatedUsers = users.filter((user) =>
-            (updatedDataset.assignedUsers || []).includes(user._id?.toString() || "")
-          );
-          setSelectedDatasetUsers(updatedUsers);
-        } else {
-          setSelectedDatasetUsers([]);
-        }
+        setSelectedAssignedUsers(updatedAssignedUsers);
       } catch (error) {
         console.error("Error removing user:", error);
         alert(`Error removing user from dataset: ${error}`);
       }
     }
-  };
-
-  const handleAssignUsers = (dataset: Dataset) => {
-    setSelectedDataset(dataset);
-    setSelectedAssignedUsers(dataset.assignedUsers || []);
-    setIsAssignUsersOpen(true);
   };
 
   const handleAssignUsersSubmit = async () => {
@@ -333,7 +332,6 @@ export default function Datasets() {
     }
 
     try {
-      // Step 1: Update the dataset's assignedUsers
       const datasetResponse = await fetch("/api/admin", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -350,25 +348,22 @@ export default function Datasets() {
         throw new Error(errorData.error || "Failed to assign users to dataset");
       }
 
-      // Step 2: Update each user's assignedDatasets
       const updatePromises = users.map(async (user) => {
         const shouldBeAssigned = selectedAssignedUsers.includes(user._id?.toString() || "");
         const currentDatasets = user.assignedDatasets || [];
-        const isCurrentlyAssigned = currentDatasets.includes(selectedDataset._id.toString());
+        const isCurrentlyAssigned = currentDatasets.includes(selectedDataset._id?.toString() || "");
 
         if (shouldBeAssigned && !isCurrentlyAssigned) {
-          // Add datasetId to user's assignedDatasets
           return fetch("/api/admin", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               action: "assign-datasets",
               email: user.email,
-              datasets: [...currentDatasets, selectedDataset._id.toString()],
+              datasets: [...currentDatasets, selectedDataset._id?.toString() || ""],
             }),
           });
         } else if (!shouldBeAssigned && isCurrentlyAssigned) {
-          // Remove datasetId from user's assignedDatasets
           return fetch("/api/admin", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -391,9 +386,8 @@ export default function Datasets() {
         }
       }
 
-      // Refresh data and close dialog
       await fetchData();
-      setIsAssignUsersOpen(false);
+      setIsManageUsersOpen(false);
     } catch (error) {
       console.error("Error assigning users:", error);
       alert(`Error assigning users to dataset: ${error}`);
@@ -425,7 +419,7 @@ export default function Datasets() {
       if (result.success) {
         fetchData();
         setIsUploadOpen(false);
-        reset();
+        resetDataset();
       } else {
         console.error("Failed to upload dataset:", result.error);
         alert(result.error || "Failed to upload dataset");
@@ -434,6 +428,14 @@ export default function Datasets() {
       console.error("Error uploading dataset:", error.message);
       alert(`Error uploading dataset: ${error.message}`);
     }
+  };
+
+  const handleUserSelection = (userId: string) => {
+    setSelectedAssignedUsers((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   if (loading) return <div className="p-4">Loading datasets...</div>;
@@ -458,7 +460,7 @@ export default function Datasets() {
               <DialogHeader>
                 <DialogTitle>{selectedDataset ? "Edit Dataset" : "New Dataset"}</DialogTitle>
               </DialogHeader>
-              <FormProvider {...methods}>
+              <FormProvider {...datasetMethods}>
                 <DatasetFormPage1 institutions={institutions} onSubmit={onUploadSubmit} />
               </FormProvider>
             </DialogContent>
@@ -536,96 +538,27 @@ export default function Datasets() {
         </Select>
       </div>
 
-      {/* Dialog for showing users */}
-      <Dialog open={showUsersOpen} onOpenChange={setShowUsersOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Users Associated with Dataset</DialogTitle>
-          </DialogHeader>
-          <div>
-            {selectedDatasetUsers.length > 0 ? (
-              <ul className="list-disc pl-5">
-                {selectedDatasetUsers.map((user) => {
-                  const institution = institutions.find(
-                    (inst) => inst._id?.toString() === user.institutionId?.toString()
-                  );
-                  return (
-                    <li key={user._id?.toString() || ""} className="flex items-center justify-between">
-                      <span>
-                        {user.name || user.email} -- Institution: {institution ? institution.name : "N/A"}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveUser(user._id?.toString() || "", selectedDataset?._id?.toString() || "")}
-                        className="ml-2 text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Remove user</span>
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p>No users assigned to this dataset.</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ManageUsersDialog
+        isOpen={isManageUsersOpen}
+        onOpenChange={setIsManageUsersOpen}
+        selectedDataset={selectedDataset}
+        selectedAssignedUsers={selectedAssignedUsers}
+        selectedInstitutions={selectedInstitutions}
+        users={users}
+        institutions={institutions}
+        handleRemoveUser={handleRemoveUser}
+        handleAssignUsersSubmit={handleAssignUsersSubmit}
+        handleUserSelection={handleUserSelection}
+        handleManageUsers={handleManageUsers}
+        setSelectedInstitutions={setSelectedInstitutions}
+      />
 
-      {/* Dialog for assigning users */}
-      <Dialog open={isAssignUsersOpen} onOpenChange={setIsAssignUsersOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Users to Dataset</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Select Institution</label>
-              <Select
-                value={institutions.find((inst) => inst._id?.toString() === selectedDataset?.institutionId?.toString())?._id?.toString() || ""}
-                onValueChange={(value) => {
-                  const filteredUsers = users.filter((user) => user.institutionId?.toString() === value);
-                  setSelectedAssignedUsers(filteredUsers.map((user) => user._id?.toString() || ""));
-                }}
-              >
-                <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="Select an institution" />
-                </SelectTrigger>
-                <SelectContent>
-                  {institutions.map((institution) => (
-                    <SelectItem key={institution._id?.toString() || ""} value={institution._id?.toString() || ""}>
-                      {institution.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Select Users</label>
-              <Select
-                value={selectedAssignedUsers.join(',')}
-                onValueChange={(values) => setSelectedAssignedUsers(values.split(',') as string[])}
-              >
-                <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="Select users" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users
-                    .filter((user) => user.institutionId?.toString() === selectedDataset?.institutionId?.toString())
-                    .map((user) => (
-                      <SelectItem key={user._id?.toString() || ""} value={user._id?.toString() || ""}>
-                        {user.name || user.email}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleAssignUsersSubmit}>Assign Users</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <MediaManagementDialog
+        isOpen={isMediaManagementOpen}
+        onOpenChange={setIsMediaManagementOpen}
+        selectedDataset={selectedDataset}
+        fetchMedia={fetchMedia}
+      />
     </div>
   );
 }

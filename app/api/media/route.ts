@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { dataset, filename, user, format, url, chunkSize, length } = await req.json();
-    if (!dataset || !filename || !user || !format || !url) {
+    const { dataset, filename, format, url, chunkSize, length, user } = await req.json();
+    if (!dataset || !filename || !format || !url || !user) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -57,12 +57,12 @@ export async function POST(req: NextRequest) {
       name: filename,
       upload_date: uploadDate,
       dataset,
-      user,
       format,
       URL: url,
       chunkSize,
       length,
       uploadDate,
+      user: user,
     };
 
     await mediaCollection.insertOne(metadata);

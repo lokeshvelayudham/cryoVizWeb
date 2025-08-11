@@ -54,6 +54,21 @@ export interface Dataset {
   fluorescentNumY?: number;
   fluorescentNumX?: number;
 }
+
+export interface DatasetChildRef {
+  datasetId: string;           // child dataset _id as string
+  alias?: string;              // user-provided child name
+  order?: number;              // for manual ordering in UI
+}
+
+export interface DatasetMapping {
+  _id?: ObjectId;
+  parentId: string;            // parent dataset _id as string
+  children: DatasetChildRef[]; // children list
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
 /**
  * Retrieves all institutions from the database.
  * @returns A promise resolving to an array of Institution objects.
@@ -375,4 +390,47 @@ export async function deleteUser(id: string) {
   } catch (error) {
     throw new Error(`Failed to delete user: ${error}`);
   }
+}
+
+
+
+
+export async function getDatasetMappings(): Promise<DatasetMapping[]> {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<DatasetMapping>("dataset_mappings").find().toArray();
+}
+
+export async function getDatasetMappingByParent(parentId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<DatasetMapping>("dataset_mappings").findOne({ parentId });
+}
+
+export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" | "createdAt">) {
+  const client = await clientPromise;
+  const db = client.db();
+
+  // Prevent duplicate mapping for same parent
+  const existing = await db.collection<DatasetMapping>("dataset_mappings").findOne({ parentId: mapping.parentId });
+  if (existing) throw new Error("Mapping already exists for this parent dataset");
+
+  const doc = { ...mapping, createdAt: new Date(), updatedAt: new Date() };
+  return db.collection<DatasetMapping>("dataset_mappings").insertOne(doc);
+}
+
+export async function updateDatasetMapping(id: string, patch: Partial<DatasetMapping>) {
+  const client = await clientPromise;
+  const db = client.db();
+  const { _id, createdAt, ...rest } = patch; // protect
+  return db.collection<DatasetMapping>("dataset_mappings").updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { ...rest, updatedAt: new Date() } }
+  );
+}
+
+export async function deleteDatasetMapping(id: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<DatasetMapping>("dataset_mappings").deleteOne({ _id: new ObjectId(id) });
 }

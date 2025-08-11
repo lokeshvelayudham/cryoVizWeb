@@ -14,7 +14,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import Users from "@/components/admin/Users";
+import Users from "@/components/admin/Users/Users";
 import { User } from "@/lib/models";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";

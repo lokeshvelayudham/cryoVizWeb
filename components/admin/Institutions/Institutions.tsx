@@ -47,36 +47,47 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import UserForm from "./UserForm";
 import InstitutionForm from "./InstitutionForm";
+import UserForm from "../Users/UserForm";
+import { User } from "@/lib/models";
 
 interface Institution {
   _id: string;
   name: string;
-}
-
-interface User {
-  _id: string;
-  name: string;
+  abbr: string;
+  type: "Industry" | "Government" | "Academic" | "Others";
+  address: string;
+  phone: string;
   email: string;
-  accessLevel: "admin" | "user";
-  institutionId: string;
-  logins: number;
-  lastLogin?: Date;
-  assignedDatasets: string[];
+  website: string;
+  status: "Active" | "Inactive" | "Hold";
+  createdAt: Date;
 }
 
-export default function Users() {
-  const [users, setUsers] = useState<User[]>([]);
+export default function Institutions() {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedInstitution, setSelectedInstitution] =
+    useState<Institution | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
 
-  const fetchData = async () => {
+  const fetchInstitutions = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admin");
+      const data = await response.json();
+      setInstitutions(data.institutions || []);
+    } catch (error) {
+      console.error("Failed to fetch institutions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const fetchUsers = async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/admin");
@@ -91,10 +102,10 @@ export default function Users() {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchInstitutions();
   }, []);
 
-  const columns: ColumnDef<User>[] = [
+  const columns: ColumnDef<Institution>[] = [
     {
       accessorKey: "name",
       header: ({ column }) => (
@@ -115,14 +126,14 @@ export default function Users() {
       ),
     },
     {
-      accessorKey: "email",
+      accessorKey: "abbr",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="p-0 hover:bg-transparent"
         >
-          <span className="mr-2">Email</span>
+          <span className="mr-2">Abbr</span>
           {column.getIsSorted() === "asc" ? (
             <ArrowUp className="h-4 w-4" />
           ) : column.getIsSorted() === "desc" ? (
@@ -134,14 +145,14 @@ export default function Users() {
       ),
     },
     {
-      accessorKey: "accessLevel",
+      accessorKey: "type",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="p-0 hover:bg-transparent"
         >
-          <span className="mr-2">Level</span>
+          <span className="mr-2">Type</span>
           {column.getIsSorted() === "asc" ? (
             <ArrowUp className="h-4 w-4" />
           ) : column.getIsSorted() === "desc" ? (
@@ -151,17 +162,21 @@ export default function Users() {
           )}
         </Button>
       ),
-      cell: ({ row }) => row.original.accessLevel,
+      cell: ({ row }) => row.original.type,
     },
+    { accessorKey: "address", header: "Address" },
+    { accessorKey: "phone", header: "Phone Number" },
+    { accessorKey: "email", header: "Email" },
+    { accessorKey: "website", header: "Website" },
     {
-      accessorKey: "logins",
+      accessorKey: "status",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="p-0 hover:bg-transparent"
         >
-          <span className="mr-2">Logins</span>
+          <span className="mr-2">Status</span>
           {column.getIsSorted() === "asc" ? (
             <ArrowUp className="h-4 w-4" />
           ) : column.getIsSorted() === "desc" ? (
@@ -171,45 +186,13 @@ export default function Users() {
           )}
         </Button>
       ),
-    },
-    {
-      accessorKey: "institutionId",
-      header: "Institution",
-      cell: ({ row }) => {
-        const institution = institutions.find(
-          (inst) => inst._id === row.original.institutionId
-        );
-        return institution ? institution.name : "N/A";
-      },
-    },
-    {
-      accessorKey: "lastLogin",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="p-0 hover:bg-transparent"
-        >
-          <span className="mr-2">Last Login</span>
-          {column.getIsSorted() === "asc" ? (
-            <ArrowUp className="h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ArrowDown className="h-4 w-4" />
-          ) : (
-            <ChevronsUpDown className="h-4 w-4" />
-          )}
-        </Button>
-      ),
-      cell: ({ row }) =>
-        row.original.lastLogin
-          ? new Date(row.original.lastLogin).toLocaleString()
-          : "N/A",
+      cell: ({ row }) => row.original.status,
     },
     {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {
-        const user = row.original;
+        const institution = row.original;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -224,14 +207,14 @@ export default function Users() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleView(user)}>
+              <DropdownMenuItem onClick={() => handleView(institution)}>
                 View
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEdit(user)}>
+              <DropdownMenuItem onClick={() => handleEdit(institution)}>
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleDelete(user._id, user.email)}
+                onClick={() => handleDelete(institution._id, institution.name)}
               >
                 Delete
               </DropdownMenuItem>
@@ -243,7 +226,7 @@ export default function Users() {
   ];
 
   const table = useReactTable({
-    data: users,
+    data: institutions,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -262,52 +245,33 @@ export default function Users() {
     },
   });
 
-  const handleView = (user: User) => {
-    setSelectedUser(user);
+  const handleView = (institution: Institution) => {
+    setSelectedInstitution(institution);
     setIsViewOpen(true);
   };
 
-  const handleEdit = (user: User) => {
-    setSelectedUser(user);
+  const handleEdit = (institution: Institution) => {
+    setSelectedInstitution(institution);
     setIsEditOpen(true);
   };
 
-  const handleDelete = async (id: string, email: string) => {
-    if (confirm(`Are you sure you want to delete ${email}?`)) {
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete ${name}?`)) {
       const response = await fetch("/api/admin", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "delete-user" }),
+        body: JSON.stringify({ id, action: "delete-institution" }),
       });
       if (response.ok) {
-        fetchData();
-        setIsViewOpen(false);
+        fetchInstitutions();
+        setIsViewOpen(false); // Close view modal if open
       } else {
-        alert("Failed to delete user");
+        alert("Failed to delete institution");
       }
     }
   };
 
-  const onSubmit = async (data: User) => {
-    try {
-      const response = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, action: "user" }),
-      });
-      const result = await response.json();
-      if (response.ok) {
-        fetchData();
-        setIsEditOpen(false);
-      } else {
-        alert(result.error || "Failed to create user");
-      }
-    } catch (error) {
-      console.error("Error creating user:", error);
-      alert("Error creating user");
-    }
-  };
-  const onSubmitInstitution = async (data: Institution) => {
+  const onSubmit = async (data: Institution) => {
     try {
       const response = await fetch("/api/admin", {
         method: "POST",
@@ -315,7 +279,7 @@ export default function Users() {
         body: JSON.stringify({ ...data, action: "institution" }),
       });
       if (response.ok) {
-        fetchData();
+        fetchInstitutions();
       } else {
         alert("Failed to create institution");
       }
@@ -324,40 +288,57 @@ export default function Users() {
       alert("Error creating institution");
     }
   };
+  const onSubmitUser = async (data: User) => {
+    try {
+      const response = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, action: "user" }),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        fetchUsers();
+      } else {
+        alert(result.error || "Failed to create user");
+      }
+    } catch (error) {
+      console.error("Error creating user:", error);
+      alert("Error creating user");
+    }
+  };
 
-  const handleUpdate = async (data: User) => {
+  const handleUpdate = async (data: Institution) => {
     try {
       const response = await fetch("/api/admin", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, action: "update-user" }),
+        body: JSON.stringify({ ...data, action: "update-institution" }),
       });
-      const result = await response.json();
       if (response.ok) {
-        fetchData();
+        fetchInstitutions();
         setIsEditOpen(false);
       } else {
-        alert(result.error || "Failed to update user");
+        alert("Failed to update institution");
       }
     } catch (error) {
-      console.error("Error updating user:", error);
-      alert("Error updating user");
+      console.error("Error updating institution:", error);
+      alert("Error updating institution");
     }
   };
 
-  if (loading) return <div className="p-4">Loading...</div>;
+  if (loading) return <div className="p-4">Loading institutions...</div>;
 
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
         <Input
-          placeholder="Search users..."
+          placeholder="Search institutions..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-sm"
         />
         <div className="flex gap-2">
-         <Dialog >
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" /> New Institution
@@ -366,16 +347,16 @@ export default function Users() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {"New Institution"}
+                {selectedInstitution ? "Edit Institution" : "New Institution"}
               </DialogTitle>
             </DialogHeader>
             <InstitutionForm
-              onSubmit={onSubmitInstitution}
-              defaultValues={null}
+              onSubmit={selectedInstitution ? handleUpdate : onSubmit}
+              defaultValues={selectedInstitution}
             />
           </DialogContent>
         </Dialog>
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <Dialog >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" /> New User
@@ -383,11 +364,11 @@ export default function Users() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{selectedUser ? "Edit User" : "New User"}</DialogTitle>
+              <DialogTitle>{"New User"}</DialogTitle>
             </DialogHeader>
             <UserForm
-              onSubmit={selectedUser ? handleUpdate : onSubmit}
-              defaultValues={selectedUser}
+              onSubmit={onSubmitUser}
+              defaultValues={null}
               institutions={institutions}
             />
           </DialogContent>
@@ -427,7 +408,7 @@ export default function Users() {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="text-center">
-                  No users found.
+                  No institutions found.
                 </TableCell>
               </TableRow>
             )}
@@ -473,64 +454,94 @@ export default function Users() {
           </SelectContent>
         </Select>
       </div>
-      {selectedUser && (
+      {selectedInstitution && (
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
           <DialogContent className="max-w-md rounded-md border border-gray-200 p-6 shadow-sm sm:max-w-lg dark:border-gray-700">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {selectedUser.name}
+                {selectedInstitution.name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Abbreviation
+                  </span>
+                  <span className="text-sm text-gray-900 dark:text-gray-200">
+                    {selectedInstitution.abbr}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
+                <div className="grid grid-cols-[100px_1fr] gap-x-4">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Type
+                  </span>
+                  <span className="text-sm text-gray-900 dark:text-gray-200">
+                    {selectedInstitution.type}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
+                <div className="grid grid-cols-[100px_1fr] gap-x-4">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Address
+                  </span>
+                  <span className="text-sm text-gray-900 dark:text-gray-200">
+                    {selectedInstitution.address || "N/A"}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
+                <div className="grid grid-cols-[100px_1fr] gap-x-4">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Phone
+                  </span>
+                  <span className="text-sm text-gray-900 dark:text-gray-200">
+                    {selectedInstitution.phone || "N/A"}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
+                <div className="grid grid-cols-[100px_1fr] gap-x-4">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Email
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedUser.email}
+                    {selectedInstitution.email}
                   </span>
                 </div>
               </div>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Level
+                    Website
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedUser.accessLevel}
+                    {selectedInstitution.website || "N/A"}
                   </span>
                 </div>
               </div>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Logins
+                    Status
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedUser.logins}
+                    {selectedInstitution.status}
                   </span>
                 </div>
               </div>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Institution
+                    Created At
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {institutions.find((inst) => inst._id === selectedUser.institutionId)?.name || "N/A"}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
-                <div className="grid grid-cols-[100px_1fr] gap-x-4">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Last Login
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedUser.lastLogin
-                      ? new Date(selectedUser.lastLogin).toLocaleString()
-                      : "N/A"}
+                    {new Date(
+                      selectedInstitution.createdAt
+                    ).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -541,7 +552,7 @@ export default function Users() {
                 className="rounded-md border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                 onClick={() => {
                   setIsViewOpen(false);
-                  handleEdit(selectedUser);
+                  handleEdit(selectedInstitution);
                 }}
               >
                 Edit
@@ -549,7 +560,12 @@ export default function Users() {
               <Button
                 variant="destructive"
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                onClick={() => handleDelete(selectedUser._id, selectedUser.email)}
+                onClick={() =>
+                  handleDelete(
+                    selectedInstitution._id,
+                    selectedInstitution.name
+                  )
+                }
               >
                 Delete
               </Button>

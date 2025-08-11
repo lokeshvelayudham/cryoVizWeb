@@ -92,6 +92,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 title: "Datasets",
                 url: "/admin/dataset",
               },
+              {
+                title: "Mappings",
+                url: "/admin/mappings",
+              },
             ],
           },
         ]

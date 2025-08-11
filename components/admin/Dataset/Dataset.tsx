@@ -400,7 +400,7 @@ export default function Datasets() {
               action: "assign-datasets",
               email: user.email,
               datasets: currentDatasets.filter(
-                (id) => id !== selectedDataset._id.toString()
+                (id) => id !== selectedDataset._id?.toString()
               ),
             }),
           });

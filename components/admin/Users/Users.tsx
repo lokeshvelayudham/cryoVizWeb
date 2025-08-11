@@ -47,47 +47,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import InstitutionForm from "./InstitutionForm";
 import UserForm from "./UserForm";
-import { User } from "@/lib/models";
+import InstitutionForm from "../Institutions/InstitutionForm";
 
 interface Institution {
   _id: string;
   name: string;
-  abbr: string;
-  type: "Industry" | "Government" | "Academic" | "Others";
-  address: string;
-  phone: string;
-  email: string;
-  website: string;
-  status: "Active" | "Inactive" | "Hold";
-  createdAt: Date;
 }
 
-export default function Institutions() {
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  accessLevel: "admin" | "user";
+  institutionId: string;
+  logins: number;
+  lastLogin?: Date;
+  assignedDatasets: string[];
+}
+
+export default function Users() {
+  const [users, setUsers] = useState<User[]>([]);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
-  const [selectedInstitution, setSelectedInstitution] =
-    useState<Institution | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const fetchInstitutions = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/admin");
-      const data = await response.json();
-      setInstitutions(data.institutions || []);
-    } catch (error) {
-      console.error("Failed to fetch institutions:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/admin");
@@ -102,10 +91,10 @@ export default function Institutions() {
   };
 
   useEffect(() => {
-    fetchInstitutions();
+    fetchData();
   }, []);
 
-  const columns: ColumnDef<Institution>[] = [
+  const columns: ColumnDef<User>[] = [
     {
       accessorKey: "name",
       header: ({ column }) => (
@@ -126,14 +115,14 @@ export default function Institutions() {
       ),
     },
     {
-      accessorKey: "abbr",
+      accessorKey: "email",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="p-0 hover:bg-transparent"
         >
-          <span className="mr-2">Abbr</span>
+          <span className="mr-2">Email</span>
           {column.getIsSorted() === "asc" ? (
             <ArrowUp className="h-4 w-4" />
           ) : column.getIsSorted() === "desc" ? (
@@ -145,14 +134,14 @@ export default function Institutions() {
       ),
     },
     {
-      accessorKey: "type",
+      accessorKey: "accessLevel",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="p-0 hover:bg-transparent"
         >
-          <span className="mr-2">Type</span>
+          <span className="mr-2">Level</span>
           {column.getIsSorted() === "asc" ? (
             <ArrowUp className="h-4 w-4" />
           ) : column.getIsSorted() === "desc" ? (
@@ -162,21 +151,17 @@ export default function Institutions() {
           )}
         </Button>
       ),
-      cell: ({ row }) => row.original.type,
+      cell: ({ row }) => row.original.accessLevel,
     },
-    { accessorKey: "address", header: "Address" },
-    { accessorKey: "phone", header: "Phone Number" },
-    { accessorKey: "email", header: "Email" },
-    { accessorKey: "website", header: "Website" },
     {
-      accessorKey: "status",
+      accessorKey: "logins",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="p-0 hover:bg-transparent"
         >
-          <span className="mr-2">Status</span>
+          <span className="mr-2">Logins</span>
           {column.getIsSorted() === "asc" ? (
             <ArrowUp className="h-4 w-4" />
           ) : column.getIsSorted() === "desc" ? (
@@ -186,13 +171,45 @@ export default function Institutions() {
           )}
         </Button>
       ),
-      cell: ({ row }) => row.original.status,
+    },
+    {
+      accessorKey: "institutionId",
+      header: "Institution",
+      cell: ({ row }) => {
+        const institution = institutions.find(
+          (inst) => inst._id === row.original.institutionId
+        );
+        return institution ? institution.name : "N/A";
+      },
+    },
+    {
+      accessorKey: "lastLogin",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="p-0 hover:bg-transparent"
+        >
+          <span className="mr-2">Last Login</span>
+          {column.getIsSorted() === "asc" ? (
+            <ArrowUp className="h-4 w-4" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ArrowDown className="h-4 w-4" />
+          ) : (
+            <ChevronsUpDown className="h-4 w-4" />
+          )}
+        </Button>
+      ),
+      cell: ({ row }) =>
+        row.original.lastLogin
+          ? new Date(row.original.lastLogin).toLocaleString()
+          : "N/A",
     },
     {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {
-        const institution = row.original;
+        const user = row.original;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -207,14 +224,14 @@ export default function Institutions() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleView(institution)}>
+              <DropdownMenuItem onClick={() => handleView(user)}>
                 View
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEdit(institution)}>
+              <DropdownMenuItem onClick={() => handleEdit(user)}>
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleDelete(institution._id, institution.name)}
+                onClick={() => handleDelete(user._id, user.email)}
               >
                 Delete
               </DropdownMenuItem>
@@ -226,7 +243,7 @@ export default function Institutions() {
   ];
 
   const table = useReactTable({
-    data: institutions,
+    data: users,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -245,50 +262,33 @@ export default function Institutions() {
     },
   });
 
-  const handleView = (institution: Institution) => {
-    setSelectedInstitution(institution);
+  const handleView = (user: User) => {
+    setSelectedUser(user);
     setIsViewOpen(true);
   };
 
-  const handleEdit = (institution: Institution) => {
-    setSelectedInstitution(institution);
+  const handleEdit = (user: User) => {
+    setSelectedUser(user);
     setIsEditOpen(true);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete ${name}?`)) {
+  const handleDelete = async (id: string, email: string) => {
+    if (confirm(`Are you sure you want to delete ${email}?`)) {
       const response = await fetch("/api/admin", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "delete-institution" }),
+        body: JSON.stringify({ id, action: "delete-user" }),
       });
       if (response.ok) {
-        fetchInstitutions();
-        setIsViewOpen(false); // Close view modal if open
+        fetchData();
+        setIsViewOpen(false);
       } else {
-        alert("Failed to delete institution");
+        alert("Failed to delete user");
       }
     }
   };
 
-  const onSubmit = async (data: Institution) => {
-    try {
-      const response = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, action: "institution" }),
-      });
-      if (response.ok) {
-        fetchInstitutions();
-      } else {
-        alert("Failed to create institution");
-      }
-    } catch (error) {
-      console.error("Error creating institution:", error);
-      alert("Error creating institution");
-    }
-  };
-  const onSubmitUser = async (data: User) => {
+  const onSubmit = async (data: User) => {
     try {
       const response = await fetch("/api/admin", {
         method: "POST",
@@ -297,7 +297,8 @@ export default function Institutions() {
       });
       const result = await response.json();
       if (response.ok) {
-        fetchUsers();
+        fetchData();
+        setIsEditOpen(false);
       } else {
         alert(result.error || "Failed to create user");
       }
@@ -306,39 +307,57 @@ export default function Institutions() {
       alert("Error creating user");
     }
   };
+  const onSubmitInstitution = async (data: Institution) => {
+    try {
+      const response = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, action: "institution" }),
+      });
+      if (response.ok) {
+        fetchData();
+      } else {
+        alert("Failed to create institution");
+      }
+    } catch (error) {
+      console.error("Error creating institution:", error);
+      alert("Error creating institution");
+    }
+  };
 
-  const handleUpdate = async (data: Institution) => {
+  const handleUpdate = async (data: User) => {
     try {
       const response = await fetch("/api/admin", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, action: "update-institution" }),
+        body: JSON.stringify({ ...data, action: "update-user" }),
       });
+      const result = await response.json();
       if (response.ok) {
-        fetchInstitutions();
+        fetchData();
         setIsEditOpen(false);
       } else {
-        alert("Failed to update institution");
+        alert(result.error || "Failed to update user");
       }
     } catch (error) {
-      console.error("Error updating institution:", error);
-      alert("Error updating institution");
+      console.error("Error updating user:", error);
+      alert("Error updating user");
     }
   };
 
-  if (loading) return <div className="p-4">Loading institutions...</div>;
+  if (loading) return <div className="p-4">Loading...</div>;
 
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
         <Input
-          placeholder="Search institutions..."
+          placeholder="Search users..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-sm"
         />
         <div className="flex gap-2">
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+         <Dialog >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" /> New Institution
@@ -347,16 +366,16 @@ export default function Institutions() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {selectedInstitution ? "Edit Institution" : "New Institution"}
+                {"New Institution"}
               </DialogTitle>
             </DialogHeader>
             <InstitutionForm
-              onSubmit={selectedInstitution ? handleUpdate : onSubmit}
-              defaultValues={selectedInstitution}
+              onSubmit={onSubmitInstitution}
+              defaultValues={null}
             />
           </DialogContent>
         </Dialog>
-        <Dialog >
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" /> New User
@@ -364,11 +383,11 @@ export default function Institutions() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{"New User"}</DialogTitle>
+              <DialogTitle>{selectedUser ? "Edit User" : "New User"}</DialogTitle>
             </DialogHeader>
             <UserForm
-              onSubmit={onSubmitUser}
-              defaultValues={null}
+              onSubmit={selectedUser ? handleUpdate : onSubmit}
+              defaultValues={selectedUser}
               institutions={institutions}
             />
           </DialogContent>
@@ -408,7 +427,7 @@ export default function Institutions() {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="text-center">
-                  No institutions found.
+                  No users found.
                 </TableCell>
               </TableRow>
             )}
@@ -454,94 +473,64 @@ export default function Institutions() {
           </SelectContent>
         </Select>
       </div>
-      {selectedInstitution && (
+      {selectedUser && (
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
           <DialogContent className="max-w-md rounded-md border border-gray-200 p-6 shadow-sm sm:max-w-lg dark:border-gray-700">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {selectedInstitution.name}
+                {selectedUser.name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Abbreviation
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.abbr}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
-                <div className="grid grid-cols-[100px_1fr] gap-x-4">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Type
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.type}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
-                <div className="grid grid-cols-[100px_1fr] gap-x-4">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Address
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.address || "N/A"}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
-                <div className="grid grid-cols-[100px_1fr] gap-x-4">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Phone
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.phone || "N/A"}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
-                <div className="grid grid-cols-[100px_1fr] gap-x-4">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Email
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.email}
+                    {selectedUser.email}
                   </span>
                 </div>
               </div>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Website
+                    Level
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.website || "N/A"}
+                    {selectedUser.accessLevel}
                   </span>
                 </div>
               </div>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Status
+                    Logins
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {selectedInstitution.status}
+                    {selectedUser.logins}
                   </span>
                 </div>
               </div>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
                 <div className="grid grid-cols-[100px_1fr] gap-x-4">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Created At
+                    Institution
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {new Date(
-                      selectedInstitution.createdAt
-                    ).toLocaleDateString()}
+                    {institutions.find((inst) => inst._id === selectedUser.institutionId)?.name || "N/A"}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800">
+                <div className="grid grid-cols-[100px_1fr] gap-x-4">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Last Login
+                  </span>
+                  <span className="text-sm text-gray-900 dark:text-gray-200">
+                    {selectedUser.lastLogin
+                      ? new Date(selectedUser.lastLogin).toLocaleString()
+                      : "N/A"}
                   </span>
                 </div>
               </div>
@@ -552,7 +541,7 @@ export default function Institutions() {
                 className="rounded-md border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                 onClick={() => {
                   setIsViewOpen(false);
-                  handleEdit(selectedInstitution);
+                  handleEdit(selectedUser);
                 }}
               >
                 Edit
@@ -560,12 +549,7 @@ export default function Institutions() {
               <Button
                 variant="destructive"
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                onClick={() =>
-                  handleDelete(
-                    selectedInstitution._id,
-                    selectedInstitution.name
-                  )
-                }
+                onClick={() => handleDelete(selectedUser._id, selectedUser.email)}
               >
                 Delete
               </Button>

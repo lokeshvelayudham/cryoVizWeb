@@ -1,6 +1,4 @@
 "use client";
-
-
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
   Breadcrumb,
@@ -16,17 +14,15 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import Institutions from "@/components/admin/Institutions/Institutions";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { redirect } from "next/navigation";
+import Users from "@/components/admin/Users/Users";
 import { User } from "@/lib/models";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Mappings from "@/components/admin/Mappings/mappings";
 
-export default function InstitutionsPage() {
-    const { data: session, status } = useSession();
+export default function UsersPage() {
+  const { data: session, status } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +80,7 @@ export default function InstitutionsPage() {
   if (user?.accessLevel !== "admin") {
     return null; // Redundant due to redirect, but kept for clarity
   }
-    
+  
 
   return (
     <SidebarProvider>
@@ -100,26 +96,20 @@ export default function InstitutionsPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/admin/institutions">Dashboard</BreadcrumbLink>
+                    <BreadcrumbLink href="/admin/mappings">Dashborad</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                    <BreadcrumbPage>
-                        Institutions
-                    </BreadcrumbPage>
+                  <BreadcrumbPage>Mappings</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-
-        
-
-        {/* Viewer */}
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min">
             <div className="p-4">
-              <Institutions />
+              <Mappings />
             </div>
           </div>
         </div>

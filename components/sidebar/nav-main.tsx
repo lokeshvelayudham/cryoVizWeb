@@ -1,78 +1,78 @@
-"use client"
+"use client";
 
-import { ChevronRight, type LucideIcon } from "lucide-react"
-
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import * as React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   SidebarGroup,
+  SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import type { LucideIcon } from "lucide-react";
 
-export function NavMain({
-  items,
-}: {
-  items: {
-    title: string
-    url: string
-    icon: LucideIcon
-    isActive?: boolean
-    items?: {
-      title: string
-      url: string
-    }[]
-  }[]
-}) {
+// Shape: top-level list (e.g., "Datasets" section)
+export type NavItem = {
+  title: string;
+  url?: string;              // can be "#" to indicate disabled
+  icon?: LucideIcon;
+  isActive?: boolean;
+  items?: NavItem[];         // nested (children)
+};
+
+export function NavMain({ items }: { items: NavItem[] }) {
+  const pathname = usePathname();
+
+  const renderItem = (item: NavItem, depth = 0) => {
+    const Icon = item.icon as LucideIcon | undefined;
+    const active =
+      (item.url && pathname === item.url) ||
+      item.isActive ||
+      (item.items?.some((c) => c.url && pathname === c.url) ?? false);
+
+    const buttonContent = (
+      <SidebarMenuButton
+        tooltip={item.title}
+        className={depth > 0 ? "pl-8" : undefined} // indent children
+        asChild={!!item.url && item.url !== "#"}
+      >
+        {item.url && item.url !== "#" ? (
+          <Link href={item.url}>
+            {Icon ? <Icon className="mr-2 h-4 w-4" /> : null}
+            <span className="truncate">{item.title}</span>
+          </Link>
+        ) : (
+          <div className="flex items-center opacity-60">
+            {Icon ? <Icon className="mr-2 h-4 w-4" /> : null}
+            <span className="truncate">{item.title}</span>
+          </div>
+        )}
+      </SidebarMenuButton>
+    );
+
+    return (
+      <React.Fragment key={`${item.title}-${item.url}-${depth}`}>
+        <SidebarMenuItem data-active={active ? "true" : undefined}>
+          {buttonContent}
+        </SidebarMenuItem>
+        {/* children */}
+        {item.items && item.items.length > 0
+          ? item.items.map((child) => renderItem(child, depth + 1))
+          : null}
+      </React.Fragment>
+    );
+  };
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item) => (
-          <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip={item.title}>
-                <a href={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </a>
-              </SidebarMenuButton>
-              {item.items?.length ? (
-                <>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuAction className="data-[state=open]:rotate-90">
-                      <ChevronRight />
-                      <span className="sr-only">Toggle</span>
-                    </SidebarMenuAction>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {item.items?.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </a>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </>
-              ) : null}
-            </SidebarMenuItem>
-          </Collapsible>
-        ))}
-      </SidebarMenu>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => renderItem(item))}
+        </SidebarMenu>
+      </SidebarGroupContent>
     </SidebarGroup>
-  )
+  );
 }

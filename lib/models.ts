@@ -1,4 +1,4 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 import clientPromise from "./mongodb";
 
 export interface Institution {
@@ -195,7 +195,7 @@ export async function updateUser(user: User) {
     if (existingUser) {
       throw new Error("Email already exists for another user");
     }
-    const { _id, logins, lastLogin, assignedDatasets, ...updateData } = user;
+    const { _id, ...updateData } = user;
     return await db.collection<User>("users").updateOne(
       { _id: new ObjectId(_id) },
       { $set: { ...updateData, updatedAt: new Date() } }
@@ -422,7 +422,7 @@ export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" |
 export async function updateDatasetMapping(id: string, patch: Partial<DatasetMapping>) {
   const client = await clientPromise;
   const db = client.db();
-  const { _id, createdAt, ...rest } = patch; // protect
+  const { ...rest } = patch; // protect
   return db.collection<DatasetMapping>("dataset_mappings").updateOne(
     { _id: new ObjectId(id) },
     { $set: { ...rest, updatedAt: new Date() } }

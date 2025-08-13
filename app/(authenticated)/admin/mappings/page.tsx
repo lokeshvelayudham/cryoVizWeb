@@ -14,12 +14,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import Users from "@/components/admin/Users/Users";
 import { User } from "@/lib/models";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Mappings from "@/components/admin/Mappings/mappings";
+import Mappings from "@/components/admin/Mappings/Mappings";
 
 export default function UsersPage() {
   const { data: session, status } = useSession();

@@ -22,7 +22,6 @@ export default function AnnotationModal({
   editingText,
   setEditingAnnotationId,
   setEditingText,
-  handleEditAnnotation,
   handleSaveEdit,
   deleteAnnotationFromMongoDB,
   onClose,
@@ -48,7 +47,7 @@ export default function AnnotationModal({
       YZ: "x",
     };
     const axis = axisMap[view];
-    setCoords((prev) => ({ ...prev, [axis]: slice }));
+    setCoords((prev: { x: number; y: number; z: number } ) => ({ ...prev, [axis]: slice }));
   };
 
   const handleCheckboxChange = (id: string) => {

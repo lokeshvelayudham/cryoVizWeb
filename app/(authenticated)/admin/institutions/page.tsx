@@ -17,9 +17,6 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import Institutions from "@/components/admin/Institutions/Institutions";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { redirect } from "next/navigation";
 import { User } from "@/lib/models";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";

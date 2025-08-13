@@ -1,25 +1,10 @@
 "use client";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { View as ViewIcon, Download, List, Eye, Save } from "lucide-react";
+import { Download, List, Eye, Save } from "lucide-react";
 import SavedViewsModal from "./SavedViewsModal";
 
-interface View {
-  _id?: string;
-  id: string;
-  name: string;
-  coords: { x: number; y: number; z: number };
-  zoom: { XY: number; XZ: number; YZ: number };
-  pan: {
-    XY: { x: number; y: number };
-    XZ: { x: number; y: number };
-    YZ: { x: number; y: number };
-  };
-  creator: string;
-  createdAt: number;
-  loadCount: number;
-  loadStats: { user: string; count: number; lastLoad: number }[];
-}
+
 
 interface ViewControlPanelProps {
   coords: { x: number; y: number; z: number };

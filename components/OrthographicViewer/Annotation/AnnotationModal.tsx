@@ -31,7 +31,7 @@ export default function AnnotationModal({
   const [position, setPosition] = useState({ x: 20, y: 20 }); // Top-left position
   const dragRef = useRef(null);
 
-  const handleDrag = (e: any, data: { x: number; y: number }) => {
+  const handleDrag = (_e: unknown, data: { x: number; y: number }) => {
     setPosition({ x: data.x, y: data.y });
   };
 

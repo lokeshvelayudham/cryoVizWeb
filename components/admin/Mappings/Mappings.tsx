@@ -130,8 +130,8 @@ export default function DatasetMappingsPage() {
       if (!mappingId && json.id) setMappingId(json.id);
       await refreshMappings(); // NEW
       toast.success("Mapping saved");
-    } catch (e: any) {
-      toast.error(e.message);
+      } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setSaving(false);
     }

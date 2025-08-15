@@ -17,17 +17,18 @@ import RenderQualitySlider from "./RenderQualitySlider";
 import ViewControls from "./ViewControls";
 import OpacitySlider from "./OpacitySlider";
 import ShaderSelector from "./ShaderSelector";
+import vtkRenderWindow from "@kitware/vtk.js/Rendering/Core/RenderWindow";
 
 const VolumeViewerPng: React.FC<{
   brightfieldBlobUrl: string;
   brightfieldNumZ: number;
   fluorescentNumZ: number;
-  datasetId: string;
+  // datasetId: string;  // eslint-disable-line @typescript-eslint/no-unused-vars
 }> = ({
   brightfieldBlobUrl,
   brightfieldNumZ,
   fluorescentNumZ,
-  datasetId,
+  // datasetId,  // eslint-disable-line @typescript-eslint/no-unused-vars
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [clip, setClip] = useState({ x: 0, y: 0, z: 0 });
@@ -44,9 +45,9 @@ const VolumeViewerPng: React.FC<{
     planeZ: vtkPlane.newInstance({ normal: [0, 0, 1], origin: [0, 0, 0] }),
   });
 
-  const renderWindowRef = useRef<any>(null);
-  const mapperRef = useRef<any>(null);
-  const opacityRef = useRef<any>(null);
+  const renderWindowRef = useRef<vtkFullScreenRenderWindow | null>(null);
+  const mapperRef = useRef<vtkVolumeMapper | null>(null);
+  const opacityRef = useRef<vtkPiecewiseFunction | null>(null);
 
   useEffect(() => {
     if (!mapperRef.current || !renderWindowRef.current) return;
@@ -59,7 +60,7 @@ const VolumeViewerPng: React.FC<{
       default:
         mapper.setBlendMode(BlendMode.COMPOSITE_BLEND);
     }
-    renderWindowRef.current.render();
+    renderWindowRef.current.getRenderWindow().render();
   }, [blendMode]);
 
   useEffect(() => {
@@ -187,13 +188,12 @@ const VolumeViewerPng: React.FC<{
       });
 
       const renderer = fullScreenRenderer.getRenderer();
-      const renderWindow = fullScreenRenderer.getRenderWindow();
-
+      const renderWindow = fullScreenRenderer.getRenderWindow() as vtkRenderWindow;
       renderer.addVolume(volume);
 
       renderer.resetCamera();
       renderWindow.render();
-      renderWindowRef.current = renderWindow;
+      renderWindowRef.current = fullScreenRenderer;
       setLoading(false);
     };
 
@@ -206,7 +206,7 @@ const VolumeViewerPng: React.FC<{
     opacityRef.current.addPoint(0, 0.0);
     opacityRef.current.addPoint(100, opacityLevel);
     opacityRef.current.addPoint(255, 1.0);
-    renderWindowRef.current.render();
+    renderWindowRef.current.getRenderWindow().render();
   }, [opacityLevel]);
 
   useEffect(() => {
@@ -214,13 +214,13 @@ const VolumeViewerPng: React.FC<{
     clipPlanes.current.planeX.setOrigin([x, 0, 0]);
     clipPlanes.current.planeY.setOrigin([0, y, 0]);
     clipPlanes.current.planeZ.setOrigin([0, 0, z]);
-    renderWindowRef.current?.render();
+    renderWindowRef.current?.getRenderWindow().render();
   }, [clip]);
 
   useEffect(() => {
     if (!renderWindowRef.current || !viewOrientation) return;
 
-    const renderer = renderWindowRef.current.getRenderers()[0];
+    const renderer = renderWindowRef.current.getRenderer();
     const camera = renderer.getActiveCamera();
     const bounds = renderer.computeVisiblePropBounds();
     const center = [
@@ -256,15 +256,15 @@ const VolumeViewerPng: React.FC<{
         break;
     }
 
-    camera.setFocalPoint(...center);
+      camera.setFocalPoint(center[0], center[1], center[2]);
     renderer.resetCameraClippingRange();
-    renderWindowRef.current.render();
+    renderWindowRef.current.getRenderWindow().render();
   }, [viewOrientation]);
 
   const handleAutoFocus = () => {
     if (!renderWindowRef.current) return;
 
-    const renderer = renderWindowRef.current.getRenderers()[0];
+      const renderer = renderWindowRef.current.getRenderer();
     const camera = renderer.getActiveCamera();
     const actors = renderer.getVolumes();
 
@@ -283,12 +283,12 @@ const VolumeViewerPng: React.FC<{
       bounds[5] - bounds[4]
     );
 
-    camera.setFocalPoint(...center);
+    camera.setFocalPoint(center[0], center[1], center[2]);
     camera.setPosition(center[0], center[1], center[2] + maxDim * 2);
     camera.setViewUp([0, 1, 0]);
 
     renderer.resetCameraClippingRange();
-    renderWindowRef.current.render();
+    renderWindowRef.current.getRenderWindow().render();
   };
 
   return (

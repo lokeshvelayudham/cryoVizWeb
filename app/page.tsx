@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { LoginForm } from "@/components/login-form";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,7 +13,6 @@ import { ModeToggle } from "@/components/ui/mode-toggle";
 export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -24,9 +22,6 @@ export default function Home() {
   if (!mounted) {
     return <div className="min-h-screen bg-background" />; // Prevent hydration mismatch
   }
-
-  const currentTheme = theme === "system" ? resolvedTheme : theme;
-  const particleColor = currentTheme === "dark" ? "#ffffff" : "#000000";
 
   return (
     <div className="min-h-screen bg-white dark:bg-black relative overflow-hidden transition-colors duration-300">

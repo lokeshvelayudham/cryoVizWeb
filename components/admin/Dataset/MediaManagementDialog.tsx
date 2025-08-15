@@ -141,9 +141,9 @@ export default function MediaManagementDialog({
       await fetchMedia(selectedDataset._id.toString());
       alert("Media uploaded successfully");
       resetMedia();
-    } catch (error: any) {
-      console.error("Error uploading media:", error.message);
-      alert(`Error uploading media: ${error.message}`);
+    } catch (error) {
+      console.error("Error uploading media:", error instanceof Error ? error.message : "Unknown error");
+      alert(`Error uploading media: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -164,9 +164,9 @@ export default function MediaManagementDialog({
         }
         await fetchMedia(selectedDataset._id.toString());
         alert("Media deleted successfully");
-      } catch (error: any) {
-        console.error("Error deleting media:", error.message);
-        alert(`Error deleting media: ${error.message}`);
+        } catch (error) {
+        console.error("Error deleting media:", error instanceof Error ? error.message : "Unknown error");
+        alert(`Error deleting media: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }
   };

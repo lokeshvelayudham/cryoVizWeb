@@ -56,8 +56,8 @@ export default function SignupPage() {
       } else {
         setMessage(result.error || "Something went wrong.");
       }
-    } catch (err: any) {
-      setMessage(err.message || "Something went wrong.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Something went wrong.");
     }
   
     setLoading(false);

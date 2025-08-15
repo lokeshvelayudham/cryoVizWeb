@@ -6,7 +6,7 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import nodemailer from "nodemailer";
 import { randomInt } from "crypto";
 
-export const authOptions: NextAuthOptions = {
+ const authOptions: NextAuthOptions = {
   providers: [
     EmailProvider({
       server: {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ObjectId } from "mongodb";
 
 export type Annotation = {
   _id?: string;
@@ -48,7 +49,20 @@ export default function useAnnotations(
       }
 
       const data = await response.json();
-      const fetchedAnnotations: Annotation[] = data.map((item: any) => ({
+      const fetchedAnnotations: Annotation[] = data.map((item: {
+        _id: ObjectId;
+        id: string;
+        view: "XY" | "XZ" | "YZ";
+        slice: number;
+        x: number;
+        y: number;
+        text: string;
+        instance: number;
+        datetime: number;
+        user: string;
+        datasetId: string;
+        status: string;
+      }) => ({
         _id: item._id?.toString() || "",
         id: item.id,
         view: item.view as "XY" | "XZ" | "YZ",

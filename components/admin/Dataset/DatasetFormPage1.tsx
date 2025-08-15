@@ -13,7 +13,7 @@ import { Institution } from "@/lib/models";
 
 interface DatasetFormPage1Props {
   institutions: Institution[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
 }
 
 export default function DatasetFormPage1({ institutions, onSubmit }: DatasetFormPage1Props) {

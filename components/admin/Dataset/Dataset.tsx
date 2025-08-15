@@ -103,7 +103,6 @@ export default function Datasets() {
     try {
       const response = await fetch(`/api/media?dataset=${datasetId}`);
       if (!response.ok) throw new Error("Failed to fetch media");
-      const data = await response.json();
       // Note: Media state is now managed by MediaManagementDialog
     } catch (error) {
       console.error("Error fetching media:", error);
@@ -454,9 +453,9 @@ export default function Datasets() {
         console.error("Failed to upload dataset:", result.error);
         alert(result.error || "Failed to upload dataset");
       }
-    } catch (error: any) {
-      console.error("Error uploading dataset:", error.message);
-      alert(`Error uploading dataset: ${error.message}`);
+    } catch (error) {
+      console.error("Error uploading dataset:", error instanceof Error ? error.message : "Unknown error");
+      alert(`Error uploading dataset: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import Draggable from "react-draggable";
 import { X, Save, Trash } from "lucide-react";
+import { ObjectId } from "mongodb";
 
 interface View {
   _id?: string;
@@ -79,7 +80,7 @@ export default function SavedViewsModal({
       if (!response.ok) throw new Error("Failed to fetch views");
       const data = await response.json();
       setSavedViews(
-        data.views.map((view: any) => ({ ...view, id: view._id.toString() })) || []
+        data.views.map((view: { _id: ObjectId; id: string }) => ({ ...view, id: view._id.toString() })) || []
       );
     } catch (error) {
       console.error("Error fetching views:", error);
@@ -253,7 +254,7 @@ export default function SavedViewsModal({
     );
   };
 
-  const handleDrag = (e: any, data: { x: number; y: number }) => {
+  const handleDrag = (_e: unknown, data: { x: number; y: number }) => {
     setListModalPosition({ x: data.x, y: data.y });
   };
 

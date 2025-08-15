@@ -48,8 +48,8 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
       console.log("API Response:", data); // Debug: Log the full response
       setMediaFiles(data.files || []);
       setSelectedFileIds([]); // Reset selection on fetch
-    } catch (error: any) {
-      console.error("Error fetching files:", error.message);
+    } catch (error) {
+      console.error("Error fetching files:", error instanceof Error ? error.message : "Unknown error");
       setErrorMessage("Failed to fetch media files");
     }
   };
@@ -72,8 +72,8 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-    } catch (error: any) {
-      console.error("Error downloading file:", error.message, "URL:", file.url);
+    } catch (error) {
+      console.error("Error downloading file:", error instanceof Error ? error.message : "Unknown error", "URL:", file.url);
       setErrorMessage(`Failed to download file: ${file.name}`);
     }
   };
@@ -89,8 +89,8 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
         if (file) await downloadFile(file);
       }
       setErrorMessage(null);
-    } catch (error: any) {
-      setErrorMessage("Failed to download some files");
+    } catch (error) {
+      setErrorMessage("Failed to download some files: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 

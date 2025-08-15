@@ -45,9 +45,6 @@ export default function AnnotationTextBox({ annotation, onUpdate, zoomXY, panXY,
   useEffect(() => {
     console.log("Annotation position:", {
       _id: annotation._id,
-      // id: annotation.id,
-      // view: annotation.view,
-      // slice: annotation.slice,
       screenX,
       screenY,
       annotationX: annotation.x,
@@ -60,7 +57,7 @@ export default function AnnotationTextBox({ annotation, onUpdate, zoomXY, panXY,
       parentTop: parentRect?.top,
       offsetX,
     });
-  }, [screenX, screenY, annotation.x, annotation.y, zoomXY, panXY, canvasRect, parentRect, offsetX  ]);
+  }, [screenX, screenY, annotation.x, annotation.y, zoomXY, panXY, canvasRect, parentRect, offsetX, annotation._id]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

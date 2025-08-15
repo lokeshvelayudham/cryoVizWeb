@@ -153,13 +153,13 @@ export default function ClientHome() {
                 <Suspense fallback={<div>Loading Volume Viewer...</div>}>
                   <VolumeViewer
                     brightfieldBlobUrl={dataset.brightfieldBlobUrl}
-                    datasetId={dataset._id.toString()}
+                    // datasetId={dataset._id.toString()}
                     brightfieldNumZ={dataset.brightfieldNumZ}
-                    brightfieldNumY={dataset.brightfieldNumY}
-                    brightfieldNumX={dataset.brightfieldNumX}
+                    // brightfieldNumY={dataset.brightfieldNumY}
+                    // brightfieldNumX={dataset.brightfieldNumX}
                     fluorescentNumZ={dataset.fluorescentNumZ}
-                    fluorescentNumY={dataset.fluorescentNumY}
-                    fluorescentNumX={dataset.fluorescentNumX}
+                    // fluorescentNumY={dataset.fluorescentNumY}
+                    // fluorescentNumX={dataset.fluorescentNumX}
                   />
                 </Suspense>
               )}

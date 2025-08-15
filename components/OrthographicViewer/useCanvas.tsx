@@ -11,6 +11,7 @@ type Dimensions = {
   xz: { width: number; height: number };
   yz: { width: number; height: number };
 };
+import type { Dispatch, SetStateAction } from "react";
 
 export default function useCanvas(
   theme: string | undefined,
@@ -18,7 +19,7 @@ export default function useCanvas(
   measureData: { XY: MeasureData; XZ: MeasureData; YZ: MeasureData },
   setLoading: (loading: boolean) => void,
   setErrorMessage: (message: string | null) => void,
-  setCoords: (coords: { x: number; y: number; z: number }) => void,
+  setCoords: Dispatch<SetStateAction<{ x: number; y: number; z: number }>>,
   brightfieldBlobUrl: string,
   brightfieldNumZ: number,
   brightfieldNumY: number,
@@ -265,6 +266,13 @@ export default function useCanvas(
     []
   );
 
+
+const panMap = {
+  XY: [panRefXY, setPanXY],
+  XZ: [panRefXZ, setPanXZ],
+  YZ: [panRefYZ, setPanYZ],
+} as const;
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isPanningRef.current) return;
@@ -273,11 +281,7 @@ export default function useCanvas(
       const dy = e.clientY - lastMouse.current.y;
       lastMouse.current = { x: e.clientX, y: e.clientY };
 
-      const panState = {
-        XY: [panRefXY, setPanXY],
-        XZ: [panRefXZ, setPanXZ],
-        YZ: [panRefYZ, setPanYZ],
-      }[isPanningRef.current];
+      const panState = panMap[isPanningRef.current];
 
       if (panState) {
         const [ref, set] = panState;

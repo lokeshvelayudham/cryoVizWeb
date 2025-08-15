@@ -494,7 +494,7 @@ export default function Datasets() {
               <FormProvider {...datasetMethods}>
                 <DatasetFormPage1
                   institutions={institutions}
-                  onSubmit={onUploadSubmit}
+                  onSubmit={(data: unknown) => onUploadSubmit(data as UploadDatasetForm)}
                 />
               </FormProvider>
             </DialogContent>
@@ -590,7 +590,7 @@ export default function Datasets() {
         handleRemoveUser={handleRemoveUser}
         handleAssignUsersSubmit={handleAssignUsersSubmit}
         handleUserSelection={handleUserSelection}
-        handleManageUsers={handleManageUsers}
+        // handleManageUsers={handleManageUsers}
         setSelectedInstitutions={setSelectedInstitutions}
       />
 

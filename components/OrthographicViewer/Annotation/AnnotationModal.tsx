@@ -13,7 +13,7 @@ interface AnnotationModalProps {
   handleSaveEdit: (id: string) => void;
   deleteAnnotationFromMongoDB: (id: string) => Promise<void>;
   onClose: () => void;
-  setCoords: (coords: { x: number; y: number; z: number }) => void; // Added to navigate to slice
+  setCoords: React.Dispatch<React.SetStateAction<{ x: number; y: number; z: number }>>;
 }
 
 export default function AnnotationModal({

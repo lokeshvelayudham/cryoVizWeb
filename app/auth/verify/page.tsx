@@ -1,22 +1,20 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
+  InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp"
+import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
 
-
-export default function OTPVerifyPage() {
+// ---- inner component (uses useSearchParams) ----
+function OTPVerifyInner() {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const searchParams = useSearchParams();
+
+  const searchParams = useSearchParams(); // must be within Suspense
   const email = searchParams.get("email") ?? "";
   const router = useRouter();
 
@@ -50,38 +48,36 @@ export default function OTPVerifyPage() {
             <span className="align-baseline text-xs">™</span> Web
           </h1>
           <p className="text-sm text-muted-foreground">
-            Sent to <span className="font-medium">{email}</span>
+            Sent to <span className="font-medium">{email || "(missing email)"}</span>
           </p>
         </div>
+
         <div className="flex justify-center">
-        <InputOTP
-          maxLength={6}
-          value={otp}
-          onChange={(val) => setOtp(val)}
-          pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
-          
-        >
-          <InputOTPGroup>
-            <InputOTPSlot index={0} />
-            <InputOTPSlot index={1} />
-            <InputOTPSlot index={2} />
-          </InputOTPGroup>
-          <InputOTPSeparator />
-          <InputOTPGroup>
-            <InputOTPSlot index={3} />
-            <InputOTPSlot index={4} />
-            <InputOTPSlot index={5} />
-          </InputOTPGroup>
-        </InputOTP>
+          <InputOTP
+            maxLength={6}
+            value={otp}
+            onChange={setOtp}
+            pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+            </InputOTPGroup>
+            <InputOTPSeparator />
+            <InputOTPGroup>
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
         </div>
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Verifying..." : "Verify OTP"}
         </Button>
 
-        {error && (
-          <p className="text-sm text-red-500 text-center -mt-3">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-500 text-center -mt-3">{error}</p>}
       </form>
 
       <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
@@ -99,5 +95,14 @@ export default function OTPVerifyPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// ---- page export (wrap in Suspense) ----
+export default function OTPVerifyPage() {
+  return (
+    <Suspense fallback={<div className="max-w-md mx-auto mt-20">Loading…</div>}>
+      <OTPVerifyInner />
+    </Suspense>
   );
 }

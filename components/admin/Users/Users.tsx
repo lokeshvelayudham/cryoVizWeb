@@ -47,8 +47,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import UserForm from "./UserForm";
-import InstitutionForm from "../Institutions/InstitutionForm";
+import UserForm, { FormData as UserFormData } from "./UserForm";
+import InstitutionForm, {
+  FormData as InstitutionFormData,
+} from "../Institutions/InstitutionForm";
 
 interface Institution {
   _id: string;
@@ -357,41 +359,57 @@ export default function Users() {
           className="max-w-sm"
         />
         <div className="flex gap-2">
-         <Dialog >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> New Institution
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {"New Institution"}
-              </DialogTitle>
-            </DialogHeader>
-            <InstitutionForm
-              onSubmit={onSubmitInstitution}
-              defaultValues={null}
-            />
-          </DialogContent>
-        </Dialog>
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> New User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{selectedUser ? "Edit User" : "New User"}</DialogTitle>
-            </DialogHeader>
-            <UserForm
-              onSubmit={selectedUser ? handleUpdate : onSubmit}
-              defaultValues={selectedUser}
-              institutions={institutions}
-            />
-          </DialogContent>
-        </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> New Institution
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{"New Institution"}</DialogTitle>
+              </DialogHeader>
+              <InstitutionForm
+                onSubmit={(data: InstitutionFormData) =>
+                  onSubmitInstitution(data as Institution)
+                }
+                defaultValues={undefined}
+              />
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> New User
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedUser ? "Edit User" : "New User"}
+                </DialogTitle>
+              </DialogHeader>
+              <UserForm
+                onSubmit={(data: UserFormData) =>
+                  selectedUser
+                    ? handleUpdate(data as User)
+                    : onSubmit(data as User)
+                }
+                defaultValues={
+                  selectedUser
+                    ? {
+                        name: selectedUser.name,
+                        email: selectedUser.email,
+                        accessLevel: selectedUser.accessLevel,
+                        institutionId: selectedUser.institutionId,
+                        _id: selectedUser._id,
+                      }
+                    : undefined
+                }
+                institutions={institutions}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       <div className="rounded-md border">
@@ -518,7 +536,9 @@ export default function Users() {
                     Institution
                   </span>
                   <span className="text-sm text-gray-900 dark:text-gray-200">
-                    {institutions.find((inst) => inst._id === selectedUser.institutionId)?.name || "N/A"}
+                    {institutions.find(
+                      (inst) => inst._id === selectedUser.institutionId
+                    )?.name || "N/A"}
                   </span>
                 </div>
               </div>
@@ -549,7 +569,9 @@ export default function Users() {
               <Button
                 variant="destructive"
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                onClick={() => handleDelete(selectedUser._id, selectedUser.email)}
+                onClick={() =>
+                  handleDelete(selectedUser._id, selectedUser.email)
+                }
               >
                 Delete
               </Button>

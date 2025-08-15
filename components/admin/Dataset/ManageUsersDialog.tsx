@@ -96,7 +96,7 @@ export default function ManageUsersDialog({
                 <Select
                   value={selectedInstitutions.join(',')}
                   onValueChange={handleInstitutionChange}
-                  multiple
+                  // multiple
                 >
                   <SelectTrigger className="w-full mt-1 text-sm">
                     <SelectValue placeholder="Select institutions" />

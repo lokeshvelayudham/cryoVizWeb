@@ -18,8 +18,8 @@ interface MediaControlPanelProps {
 
 export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaControlPanelProps) {
   const { data: session } = useSession();
-  const userEmail = session?.user?.email || null;
-  const userId = session?.user?.id || userEmail; // Use user.id if available, fallback to email
+  const userEmail = session?.user?.email ?? undefined;
+  const userId: string | undefined = session?.user?.name ?? userEmail; // no nulls  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
@@ -40,7 +40,7 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "X-User-Id": userId, // Pass userId in header for API to use
+          ...(userId ? { "X-User-Id": userId } : {}),
         },
       });
       if (!response.ok) throw new Error("Failed to fetch files");
@@ -59,7 +59,7 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
       const response = await fetch(file.url, {
         method: "GET",
         headers: {
-          "X-User-Id": userId, // Add user ID for authenticated access if required
+          ...(userId ? { "X-User-Id": userId } : {}),
         },
       });
       if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);

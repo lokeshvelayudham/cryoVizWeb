@@ -37,7 +37,7 @@ export default function MediaManagementDialog({
 }: MediaManagementDialogProps) {
   const [mediaFiles, setMediaFiles] = useState<{ id: string; name: string; url: string }[]>([]);
   const { data: session } = useSession();
-  const userId = session?.user?.id || session?.user?.email; 
+  const userId = session?.user?.email;
 
   const mediaMethods = useForm<UploadMediaForm>({
     resolver: zodResolver(uploadMediaSchema),

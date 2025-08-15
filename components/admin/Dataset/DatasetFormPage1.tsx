@@ -58,7 +58,7 @@ export default function DatasetFormPage1({ institutions, onSubmit }: DatasetForm
                   </SelectTrigger>
                   <SelectContent>
                     {institutions.map((inst) => (
-                      <SelectItem key={inst._id} value={inst._id}>
+                      <SelectItem key={inst._id?.toString() || ""} value={inst._id?.toString() || ""}>
                         {inst.name}
                       </SelectItem>
                     ))}

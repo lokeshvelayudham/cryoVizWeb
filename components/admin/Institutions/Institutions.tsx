@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
-  SelectContent,
+  SelectContent,  
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -47,8 +47,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import InstitutionForm from "./InstitutionForm";
-import UserForm from "../Users/UserForm";
+import InstitutionForm, { FormData } from "./InstitutionForm";
+import UserForm, { FormData as UserFormData } from "../Users/UserForm";
 import { User } from "@/lib/models";
 
 interface Institution {
@@ -338,41 +338,61 @@ export default function Institutions() {
           className="max-w-sm"
         />
         <div className="flex gap-2">
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> New Institution
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {selectedInstitution ? "Edit Institution" : "New Institution"}
-              </DialogTitle>
-            </DialogHeader>
-            <InstitutionForm
-              onSubmit={selectedInstitution ? handleUpdate : onSubmit}
-              defaultValues={selectedInstitution}
-            />
-          </DialogContent>
-        </Dialog>
-        <Dialog >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> New User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{"New User"}</DialogTitle>
-            </DialogHeader>
-            <UserForm
-              onSubmit={onSubmitUser}
-              defaultValues={null}
-              institutions={institutions}
-            />
-          </DialogContent>
-        </Dialog>
+          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> New Institution
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedInstitution ? "Edit Institution" : "New Institution"}
+                </DialogTitle>
+              </DialogHeader>
+              <InstitutionForm
+                onSubmit={(data: FormData) =>
+                  selectedInstitution
+                    ? handleUpdate(data as Institution)
+                    : onSubmit(data as Institution)
+                }
+                defaultValues={
+                  selectedInstitution
+                    ? {
+                        name: selectedInstitution.name,
+                        abbr: selectedInstitution.abbr,
+                        type: selectedInstitution.type,
+                        email: selectedInstitution.email,
+                        status: selectedInstitution.status,
+                        _id: selectedInstitution._id,
+                        address: selectedInstitution.address,
+                        phone: selectedInstitution.phone,
+                        website: selectedInstitution.website,
+                      }
+                    : undefined
+                }
+              />
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> New User
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{"New User"}</DialogTitle>
+              </DialogHeader>
+              <UserForm
+                onSubmit={(data: UserFormData) =>
+                  onSubmitUser(data as unknown as User)
+                }
+                defaultValues={undefined}
+                institutions={institutions}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       <div className="rounded-md border">

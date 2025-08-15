@@ -153,15 +153,6 @@ export default function OrthographicViewer(props: ViewerProps) {
       setMeasureData
     );
 
-  // 🔐 After all hooks, you can guard-render
-  // if (!datasetId) {
-  //   return (
-  //     <div className="h-full w-full p-4 flex items-center justify-center">
-  //       <p className="text-red-500">Error: Please select a dataset to view.</p>
-  //     </div>
-  //   );
-  // }
-
   // Sync color from canvas
   useEffect(() => {
     setActivePixelColor(canvasActivePixelColor);
@@ -331,7 +322,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                 a.slice === coords.z && (
                   <AnnotationTextBox
                     key={a._id || a.id}
-                    annotation={a}
+                    annotation={{ ...a, _id: a._id ?? a.id }} // force _id to exist
                     zoomXY={zoomXY}
                     panXY={panXY}
                     canvasRef={canvasXY as React.RefObject<HTMLCanvasElement>}
@@ -388,7 +379,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                 a.slice === coords.y && (
                   <AnnotationTextBox
                     key={a._id || a.id}
-                    annotation={a}
+                    annotation={{ ...a, _id: a._id ?? a.id }} // force _id to exist
                     zoomXY={zoomXZ}
                     panXY={panXZ}
                     canvasRef={canvasXZ as React.RefObject<HTMLCanvasElement>}
@@ -445,7 +436,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                 a.slice === coords.x && (
                   <AnnotationTextBox
                     key={a._id || a.id}
-                    annotation={a}
+                    annotation={{ ...a, _id: a._id ?? a.id }} // force _id to exist 
                     zoomXY={zoomYZ}
                     panXY={panYZ}
                     canvasRef={canvasYZ as React.RefObject<HTMLCanvasElement>}

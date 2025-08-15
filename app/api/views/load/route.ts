@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+// ----- Helpers -----
+const toJsonErr = (e: unknown) =>
+  e instanceof Error ? { error: e.message } : { error: "Unknown error" };
+
 export async function POST(req: NextRequest) {
   try {
     const client = await clientPromise;
@@ -24,9 +28,9 @@ export async function POST(req: NextRequest) {
     }
 
     const loadStats = view.loadStats || [];
-    const userStat = loadStats.find((stat: any) => stat.user === user);
+    const userStat = loadStats.find((stat: { user: string }) => stat.user === user);
     const updatedStats = userStat
-      ? loadStats.map((stat: any) =>
+      ? loadStats.map((stat: { user: string; count: number; lastLoad: Date }) =>
           stat.user === user
             ? { ...stat, count: stat.count + 1, lastLoad: new Date() }
             : stat
@@ -47,7 +51,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error loading view:", error);
-    return NextResponse.json({ error: "Failed to load view" }, { status: 500 });
+    console.error("Error loading view:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json(toJsonErr(error), { status: 500 });
   }
 }

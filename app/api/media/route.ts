@@ -1,13 +1,49 @@
 import { BlobServiceClient } from "@azure/storage-blob";
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 
+// ----- Mongo setup -----
 const connectionString = process.env.MONGODB_URI;
 if (!connectionString) {
   throw new Error("MONGODB_URI is not set");
 }
 const client = new MongoClient(connectionString);
 
+// ----- Types -----
+type MediaDoc = {
+  _id: ObjectId;
+  name: string;
+  dataset: string;
+  format: string;
+  URL: string;
+  chunkSize?: number;
+  length?: number;
+  uploadDate: Date;
+  user: string;
+};
+
+type ListFile = {
+  id: string;
+  name: string;
+  tag: string;
+  url: string;
+};
+
+type PostBody = {
+  dataset: string;
+  filename: string;
+  format: string;
+  url: string;
+  chunkSize?: number;
+  length?: number;
+  user: string;
+};
+
+// ----- Helpers -----
+const toJsonErr = (e: unknown) =>
+  e instanceof Error ? { error: e.message } : { error: "Unknown error" };
+
+// ----- GET -----
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -18,63 +54,71 @@ export async function GET(req: NextRequest) {
 
     await client.connect();
     const db = client.db();
-    const mediaCollection = db.collection("media");
+    const mediaCollection = db.collection<MediaDoc>("media");
 
-    const files = await mediaCollection
-      .find({ dataset })
-      .toArray()
-      .then((docs) =>
-        docs.map((doc) => ({
-          id: doc._id.toString(),
-          name: doc.name,
-          tag: doc.format,
-          url: doc.URL,
-        }))
-      );
+    const docs = await mediaCollection.find({ dataset }).toArray();
+
+    const files: ListFile[] = docs.map((doc) => ({
+      id: doc._id.toString(),
+      name: doc.name,
+      tag: doc.format,
+      url: doc.URL,
+    }));
 
     return NextResponse.json({ files });
-  } catch (error: any) {
-    console.error("Error listing files:", error.message);
-    return NextResponse.json({ error: "Failed to list files" }, { status: 500 });
+  } catch (e: unknown) {
+    console.error("Error listing files:", e);
+    return NextResponse.json(toJsonErr(e), { status: 500 });
   } finally {
     await client.close();
   }
 }
 
+// ----- POST -----
 export async function POST(req: NextRequest) {
   try {
-    const { dataset, filename, format, url, chunkSize, length, user } = await req.json();
-    if (!dataset || !filename || !format || !url || !user) {
+    const body: unknown = await req.json();
+    if (
+      !body ||
+      typeof body !== "object" ||
+      typeof (body as PostBody).dataset !== "string" ||
+      typeof (body as PostBody).filename !== "string" ||
+      typeof (body as PostBody).format !== "string" ||
+      typeof (body as PostBody).url !== "string" ||
+      typeof (body as PostBody).user !== "string"
+    ) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    const { dataset, filename, format, url, chunkSize, length, user } = body as PostBody;
+
     await client.connect();
     const db = client.db();
-    const mediaCollection = db.collection("media");
+    const mediaCollection = db.collection<MediaDoc>("media");
 
     const uploadDate = new Date();
-    const metadata = {
+    const metadata: Omit<MediaDoc, "_id"> = {
       name: filename,
-      upload_date: uploadDate,
+      uploadDate,
       dataset,
       format,
       URL: url,
       chunkSize,
       length,
-      uploadDate,
-      user: user,
+      user,
     };
 
-    await mediaCollection.insertOne(metadata);
+    await mediaCollection.insertOne(metadata as unknown as MediaDoc);
     return NextResponse.json({ message: "Metadata saved", metadata });
-  } catch (error: any) {
-    console.error("Error saving metadata:", error.message);
-    return NextResponse.json({ error: "Failed to save metadata" }, { status: 500 });
+  } catch (e: unknown) {
+    console.error("Error saving metadata:", e);
+    return NextResponse.json(toJsonErr(e), { status: 500 });
   } finally {
     await client.close();
   }
 }
 
+// ----- DELETE -----
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -84,25 +128,25 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Dataset and filename are required" }, { status: 400 });
     }
 
-    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-    if (!connectionString) {
+    const storageConn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    if (!storageConn) {
       throw new Error("AZURE_STORAGE_CONNECTION_STRING is not set");
     }
 
-    const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+    const blobServiceClient = BlobServiceClient.fromConnectionString(storageConn);
     const containerClient = blobServiceClient.getContainerClient("media");
     const blobClient = containerClient.getBlockBlobClient(`${dataset}/${filename}`);
     await blobClient.deleteIfExists();
 
     await client.connect();
     const db = client.db();
-    const mediaCollection = db.collection("media");
+    const mediaCollection = db.collection<MediaDoc>("media");
     await mediaCollection.deleteOne({ dataset, name: filename });
 
     return NextResponse.json({ message: "File and metadata deleted" });
-  } catch (error: any) {
-    console.error("Error deleting file:", error.message);
-    return NextResponse.json({ error: "Failed to delete file" }, { status: 500 });
+  } catch (e: unknown) {
+    console.error("Error deleting file:", e);
+    return NextResponse.json(toJsonErr(e), { status: 500 });
   } finally {
     await client.close();
   }

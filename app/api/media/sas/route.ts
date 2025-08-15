@@ -1,6 +1,10 @@
 import { BlobServiceClient, BlobSASPermissions, generateBlobSASQueryParameters, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { NextRequest, NextResponse } from "next/server";
 
+// ----- Helpers -----
+const toJsonErr = (e: unknown) =>
+  e instanceof Error ? { error: e.message } : { error: "Unknown error" };
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -47,8 +51,8 @@ export async function GET(req: NextRequest) {
     console.log("Generated SAS URL:", sasUrl);
     console.log("SAS Token Details:", { blobName, permissions: permissions.toString(), startsOn, expiresOn });
     return NextResponse.json({ sasUrl, blobName });
-  } catch (error: any) {
-    console.error("Error generating SAS token:", error.message, error.stack);
-    return NextResponse.json({ error: `Failed to generate SAS token: ${error.message}` }, { status: 500 });
+  } catch (error) {
+    console.error("Error generating SAS token:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json(toJsonErr(error), { status: 500 });
   }
 }

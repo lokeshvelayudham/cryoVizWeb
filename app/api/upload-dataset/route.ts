@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+// ----- Helpers -----
+const toJsonErr = (e: unknown) =>
+  e instanceof Error ? { error: e.message } : { error: "Unknown error" };
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -66,11 +70,8 @@ export async function POST(request: Request) {
         { status: adminResponse.status }
       );
     }
-  } catch (error: any) {
-    console.error("Error uploading dataset:", error);
-    return NextResponse.json(
-      { error: "Internal server error", details: error.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("Error uploading dataset:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json(toJsonErr(error), { status: 500 });
   }
 }

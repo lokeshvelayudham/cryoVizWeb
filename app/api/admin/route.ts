@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 import {
   getInstitutions,
   getUsers,
@@ -14,104 +15,227 @@ import {
   deleteDataset,
   updateUserDatasets,
 } from "@/lib/models";
+import type { Dataset, Institution, User } from "@/lib/models";
 
-export async function GET(request: Request) {
+// ---------- utils ----------
+const isObj = (x: unknown): x is Record<string, unknown> =>
+  !!x && typeof x === "object";
+
+const jerr = (e: unknown) =>
+  e instanceof Error ? { error: e.message } : { error: "Unknown error" };
+
+// ---------- GET ----------
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const datasetId = searchParams.get("datasetId");
 
   if (datasetId) {
     const datasets = await getDatasets();
-    const dataset = datasets.find((d) => d._id?.toString() === datasetId);
-    if (dataset) {
-      return NextResponse.json({ dataset });
-    }
+    const dataset = (datasets as Dataset[]).find(
+      (d) => d._id?.toString() === datasetId
+    );
+    if (dataset) return NextResponse.json({ dataset });
     return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
   }
 
-  const institutions = await getInstitutions();
-  const users = await getUsers();
-  const datasets = await getDatasets();
+  const [institutions, users, datasets] = await Promise.all([
+    getInstitutions(),
+    getUsers(),
+    getDatasets(),
+  ]);
+
   return NextResponse.json({ institutions, users, datasets });
 }
 
-export async function POST(request: Request) {
-  try {
-    const contentType = request.headers.get("content-type") || "";
-    
-    if (contentType.includes("application/json")) {
-      const { action, ...data } = await request.json();
+// ---------- POST (create + assign) ----------
+type PostAction = "dataset" | "institution" | "user" | "assign-datasets";
 
-      if (action === "dataset") {
-        try {
-          const result = await createDataset(data);
-          return NextResponse.json({ success: true, id: result.insertedId.toString() });
-        } catch (error: unknown) {
-          
-          console.error("Error creating dataset:", error);
-          return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-        }
-      } else if (action === "institution") {
-        const result = await createInstitution(data);
+function isPostBody(x: unknown): x is { action: PostAction } & Record<string, unknown> {
+  return isObj(x) && typeof x.action === "string";
+}
+
+export async function POST(request: NextRequest) {
+  const ct = request.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) {
+    return NextResponse.json({ error: "Unsupported Content-Type" }, { status: 400 });
+  }
+
+  const body = await request.json();
+  if (!isPostBody(body)) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  try {
+    switch (body.action) {
+      case "dataset": {
+        // Expect a Dataset sans _id/createdAt (createDataset handles cleanup)
+        const data = body as Omit<Dataset, "_id" | "createdAt"> & { action: "dataset" };
+        const result = await createDataset(data);
         return NextResponse.json({ success: true, id: result.insertedId.toString() });
-      } else if (action === "user") {
-        try {
-          const result = await createUser(data);
-          return NextResponse.json({ success: true, id: result.insertedId.toString() });
-        } catch (error: any) {
-          console.error("Error creating user:", error);
-          return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      }
+
+      case "institution": {
+        // Minimal Institution fields; model adds createdAt
+        const b = body as { action: "institution" } & Partial<Institution>;
+        if (typeof b.name !== "string" || typeof b.abbr !== "string") {
+          return NextResponse.json({ error: "Missing name/abbr" }, { status: 400 });
         }
-      } else if (action === "assign-datasets") {
-        const result = await updateUserDatasets(data.email, data.datasets);
+        const inst: Omit<Institution, "_id" | "createdAt"> = {
+          name: b.name,
+          abbr: b.abbr,
+          type: (b.type as Institution["type"]) ?? "Others",
+          industry: b.industry ?? "",
+          address: b.address ?? "",
+          phone: b.phone ?? "",
+          email: b.email ?? "",
+          website: b.website ?? "",
+          status: (b.status as Institution["status"]) ?? "Active",
+        };
+        const result = await createInstitution(inst);
+        return NextResponse.json({ success: true, id: result.insertedId.toString() });
+      }
+
+      case "user": {
+        const b = body as { action: "user" } & Partial<User>;
+        if (typeof b.email !== "string" || typeof b.name !== "string") {
+          return NextResponse.json({ error: "Missing name/email" }, { status: 400 });
+        }
+        if (!(b.institutionId instanceof ObjectId) && typeof b.institutionId !== "string") {
+          return NextResponse.json({ error: "Invalid institutionId" }, { status: 400 });
+        }
+        const user: Omit<User, "_id" | "logins" | "lastLogin" | "assignedDatasets"> = {
+          name: b.name,
+          email: b.email,
+          accessLevel: (b.accessLevel as User["accessLevel"]) ?? "user",
+          institutionId:
+            b.institutionId instanceof ObjectId ? b.institutionId : new ObjectId(b.institutionId),
+        };
+        const result = await createUser(user);
+        return NextResponse.json({ success: true, id: result.insertedId.toString() });
+      }
+
+      case "assign-datasets": {
+        const b = body as { action: "assign-datasets"; email?: string; datasets?: unknown };
+        if (typeof b.email !== "string" || !Array.isArray(b.datasets) || !b.datasets.every((d) => typeof d === "string")) {
+          return NextResponse.json({ error: "Invalid assign payload" }, { status: 400 });
+        }
+        const result = await updateUserDatasets(b.email, b.datasets);
         return NextResponse.json({ success: !!result.modifiedCount });
       }
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-    } else {
-      return NextResponse.json({ error: "Unsupported Content-Type" }, { status: 400 });
+
+      default:
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
-  } catch (error: any) {
-    console.error("Error in POST /api/admin:", error);
-    return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 });
+  } catch (e) {
+    console.error("POST /api/admin error:", e);
+    return NextResponse.json(jerr(e), { status: 400 });
   }
 }
 
-export async function PUT(request: Request) {
-  const { action, ...data } = await request.json();
+// ---------- PUT (updates) ----------
+type PutAction = "update-institution" | "update-user" | "update-dataset";
 
-  if (action === "update-institution") {
-    const result = await updateInstitution(data as any);
-    return NextResponse.json({ success: !!result.modifiedCount });
-  } else if (action === "update-user") {
-    try {
-      const result = await updateUser(data as any);
-      return NextResponse.json({ success: !!result.modifiedCount });
-    } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-    }
-  } else if (action === "update-dataset") {
-    try {
-      const result = await updateDataset(data as any);
-      return NextResponse.json({ success: !!result.modifiedCount });
-    } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-    }
-  }
-  return NextResponse.json({ success: false }, { status: 400 });
+function isPutBody(x: unknown): x is { action: PutAction } & Record<string, unknown> {
+  return isObj(x) && typeof x.action === "string";
 }
 
-export async function DELETE(request: Request) {
-  const { id, action } = await request.json();
-  if (!id) return NextResponse.json({ success: false }, { status: 400 });
+export async function PUT(request: NextRequest) {
+  const body = await request.json();
+  if (!isPutBody(body)) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  if (action === "delete-institution") {
-    const result = await deleteInstitution(id);
-    return NextResponse.json({ success: !!result.deletedCount });
-  } else if (action === "delete-user") {
-    const result = await deleteUser(id);
-    return NextResponse.json({ success: !!result.deletedCount });
-  } else if (action === "delete-dataset") {
-    const result = await deleteDataset(id);
-    return NextResponse.json({ success: !!result.deletedCount });
+  try {
+    switch (body.action) {
+      case "update-institution": {
+        // Convert string id -> ObjectId and pass full Institution shape to model
+        const b = body as {
+          action: "update-institution";
+          _id?: string | ObjectId;
+        } & Partial<Institution>;
+        if (!b._id) return NextResponse.json({ error: "_id required" }, { status: 400 });
+
+        const _id = b._id instanceof ObjectId ? b._id : new ObjectId(b._id);
+        const inst: Institution = {
+          ...(b as Institution),
+          _id,
+          createdAt: (b.createdAt as Date) ?? new Date(0), // not used by update
+        };
+        const result = await updateInstitution(inst);
+        return NextResponse.json({ success: !!result.modifiedCount });
+      }
+
+      case "update-user": {
+        const b = body as {
+          action: "update-user";
+          _id?: string | ObjectId;
+        } & Partial<User>;
+        if (!b._id || typeof b.email !== "string") {
+          return NextResponse.json({ error: "Missing _id/email" }, { status: 400 });
+        }
+        const _id = b._id instanceof ObjectId ? b._id : new ObjectId(b._id);
+        const user: User = {
+          ...(b as User),
+          _id,
+          institutionId:
+            b.institutionId instanceof ObjectId ? b.institutionId : new ObjectId(b.institutionId as unknown as string),
+          logins: b.logins ?? 0,
+          assignedDatasets: Array.isArray(b.assignedDatasets) ? b.assignedDatasets : [],
+        };
+        const result = await updateUser(user);
+        return NextResponse.json({ success: !!result.modifiedCount });
+      }
+
+      case "update-dataset": {
+        const b = body as {
+          action: "update-dataset";
+          _id?: string | ObjectId;
+        } & Partial<Dataset>;
+        if (!b._id) return NextResponse.json({ error: "_id required" }, { status: 400 });
+        const _id = b._id instanceof ObjectId ? b._id : new ObjectId(b._id);
+        const dataset: Dataset = {
+          // model’s updateDataset expects Dataset with _id
+          ...(b as Dataset),
+          _id,
+          createdAt: (b.createdAt as Date) ?? new Date(0), // placeholder; not used in update
+        };
+        const result = await updateDataset(dataset);
+        return NextResponse.json({ success: !!result.modifiedCount });
+      }
+
+      default:
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+  } catch (e) {
+    console.error("PUT /api/admin error:", e);
+    return NextResponse.json(jerr(e), { status: 400 });
   }
-  return NextResponse.json({ success: false }, { status: 400 });
+}
+
+// ---------- DELETE ----------
+function isDeleteBody(x: unknown): x is { action: "delete-institution" | "delete-user" | "delete-dataset"; id: string } {
+  return isObj(x) && typeof x.action === "string" && typeof x.id === "string";
+}
+
+export async function DELETE(request: NextRequest) {
+  const body = await request.json();
+  if (!isDeleteBody(body)) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+
+  try {
+    const { id, action } = body;
+    if (action === "delete-institution") {
+      const r = await deleteInstitution(id);
+      return NextResponse.json({ success: !!r.deletedCount });
+    }
+    if (action === "delete-user") {
+      const r = await deleteUser(id);
+      return NextResponse.json({ success: !!r.deletedCount });
+    }
+    if (action === "delete-dataset") {
+      const r = await deleteDataset(id);
+      return NextResponse.json({ success: !!r.deletedCount });
+    }
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  } catch (e) {
+    console.error("DELETE /api/admin error:", e);
+    return NextResponse.json(jerr(e), { status: 400 });
+  }
 }

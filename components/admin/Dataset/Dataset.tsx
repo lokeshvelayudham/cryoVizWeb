@@ -29,7 +29,6 @@ import {
   ArrowDown,
   ChevronsUpDown,
   Plus,
-  Trash2,
 } from "lucide-react";
 import {
   useReactTable,
@@ -53,7 +52,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import DatasetFormPage1 from "@/components/admin/Dataset/DatasetFormPage1";
 import { Institution, User, Dataset } from "@/lib/models";
-import { Checkbox } from "@/components/ui/checkbox";
 import ManageUsersDialog from "./ManageUsersDialog";
 import MediaManagementDialog from "./MediaManagementDialog";
 
@@ -218,8 +216,7 @@ export default function Datasets() {
     },
   });
 
-  const { reset: resetDataset, handleSubmit: handleDatasetSubmit } =
-    datasetMethods;
+  const { reset: resetDataset } = datasetMethods;
 
   const handleEdit = (dataset: Dataset) => {
     setSelectedDataset(dataset);

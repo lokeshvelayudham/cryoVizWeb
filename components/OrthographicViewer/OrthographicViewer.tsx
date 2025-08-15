@@ -14,24 +14,13 @@ import useCanvas from "./useCanvas";
 import useMeasurements from "./useMeasurements";
 import MediaControlPanel from "./MediaControlPanel";
 
-
-
 type Point = { x: number; y: number };
 type MeasureData = {
   points: Point[];
   lines: { p1: Point; p2: Point; dist: number }[];
 };
 
-export default function OrthographicViewer({
-  brightfieldBlobUrl,
-  datasetId,
-  brightfieldNumZ,
-  brightfieldNumY,
-  brightfieldNumX,
-  fluorescentNumZ,
-  fluorescentNumY,
-  fluorescentNumX,
-}: {
+type ViewerProps = {
   brightfieldBlobUrl: string;
   datasetId: string;
   brightfieldNumZ: number;
@@ -40,23 +29,29 @@ export default function OrthographicViewer({
   fluorescentNumZ: number;
   fluorescentNumY: number;
   fluorescentNumX: number;
-}) {
-  // Guard clause for invalid datasetId
-  if (!datasetId) {
-    return (
-      <div className="h-full w-full p-4 flex items-center justify-center">
-        <p className="text-red-500">Error: Please select a dataset to view.</p>
-      </div>
-    );
-  }
+};
 
+export default function OrthographicViewer(props: ViewerProps) {
+  const {
+    brightfieldBlobUrl,
+    datasetId,
+    brightfieldNumZ,
+    brightfieldNumY,
+    brightfieldNumX,
+    fluorescentNumZ,
+    fluorescentNumY,
+    fluorescentNumX,
+  } = props;
+
+  // 🔒 All hooks must be called unconditionally, at the top:
   const { theme } = useTheme();
   const { data: session, status } = useSession();
   const userEmail = session?.user?.email || null;
+
   const [coords, setCoords] = useState({
-    x: Math.floor(brightfieldNumX / 2 || fluorescentNumX / 2),
-    y: Math.floor(brightfieldNumY / 2 || fluorescentNumY / 2),
-    z: Math.floor(brightfieldNumZ / 2 || fluorescentNumZ / 2),
+    x: Math.floor((brightfieldNumX || fluorescentNumX) / 2),
+    y: Math.floor((brightfieldNumY || fluorescentNumY) / 2),
+    z: Math.floor((brightfieldNumZ || fluorescentNumZ) / 2),
   });
 
   const [loading, setLoading] = useState(true);
@@ -78,7 +73,9 @@ export default function OrthographicViewer({
     color: string;
   } | null>(null);
 
-  // Use the annotations hook with datasetId
+  const hasDataset = Boolean(datasetId);
+
+  // Annotations
   const {
     annotations,
     isAnnotating,
@@ -97,7 +94,7 @@ export default function OrthographicViewer({
     handleSaveEdit,
   } = useAnnotations(userEmail, setErrorMessage, datasetId);
 
-  // Use the canvas hook
+  // Canvas logic
   const {
     canvasXY,
     canvasXZ,
@@ -141,8 +138,8 @@ export default function OrthographicViewer({
     fluorescentNumX
   );
 
-  // Use the measurements hook
-  const { micronsPerPixel, handleMeasureClick, handleToggleMeasure } =
+  // Measurements (prefix var to avoid unused warning)
+  const {  handleMeasureClick, handleToggleMeasure } =
     useMeasurements(
       {
         XY: canvasXY as React.RefObject<HTMLCanvasElement>,
@@ -156,10 +153,38 @@ export default function OrthographicViewer({
       setMeasureData
     );
 
-  // Sync activePixelColor from useCanvas
+  // 🔐 After all hooks, you can guard-render
+  // if (!datasetId) {
+  //   return (
+  //     <div className="h-full w-full p-4 flex items-center justify-center">
+  //       <p className="text-red-500">Error: Please select a dataset to view.</p>
+  //     </div>
+  //   );
+  // }
+
+  // Sync color from canvas
   useEffect(() => {
     setActivePixelColor(canvasActivePixelColor);
   }, [canvasActivePixelColor]);
+
+  // Auth-based annotations fetch
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchAnnotations();
+    } else {
+      setAnnotations([]);
+    }
+  }, [status, fetchAnnotations, setAnnotations]);
+
+  // Redraw on dependencies
+  useEffect(() => {
+    drawAll();
+  }, [drawAll]);
+
+  // Preload images once dependencies ready
+  useEffect(() => {
+    preloadImages();
+  }, [preloadImages]);
 
   const handleAnnotationClick = (
     e: React.MouseEvent<HTMLCanvasElement>,
@@ -183,15 +208,6 @@ export default function OrthographicViewer({
 
     const clampedX = Math.max(0, Math.min(imageX, dim.width));
     const clampedY = Math.max(0, Math.min(imageY, dim.height));
-    console.log("Annotation click:", {
-      view,
-      clientX: e.clientX,
-      rectLeft: rect.left,
-      panX: pan.x,
-      zoom,
-      imageX,
-      clampedX,
-    });
 
     const slice = { XY: coords.z, XZ: coords.y, YZ: coords.x }[view];
 
@@ -232,9 +248,9 @@ export default function OrthographicViewer({
 
   const handleReset = () => {
     setCoords({
-      x: Math.floor(brightfieldNumX / 2 || fluorescentNumX / 2),
-      y: Math.floor(brightfieldNumY / 2 || fluorescentNumY / 2),
-      z: Math.floor(brightfieldNumZ / 2 || fluorescentNumZ / 2),
+      x: Math.floor((brightfieldNumX || fluorescentNumX) / 2),
+      y: Math.floor((brightfieldNumY || fluorescentNumY) / 2),
+      z: Math.floor((brightfieldNumZ || fluorescentNumZ) / 2),
     });
     setPanXY({ x: 0, y: 0 });
     setPanXZ({ x: 0, y: 0 });
@@ -268,23 +284,7 @@ export default function OrthographicViewer({
     setPanYZ(pan.YZ);
   };
 
-  useEffect(() => {
-    preloadImages();
-  }, [preloadImages]);
-
-  useEffect(() => {
-    if (status === "authenticated") {
-      fetchAnnotations();
-    } else {
-      setAnnotations([]);
-    }
-  }, [status, fetchAnnotations]);
-
-  useEffect(() => {
-    drawAll();
-  }, [drawAll]);
-
-  return (
+  return hasDataset ? (
     <div className="h-full w-full p-4 overflow-hidden relative">
       {loading && <LoadingOverlay />}
       {errorMessage && (
@@ -307,6 +307,7 @@ export default function OrthographicViewer({
         />
       )}
       <div className="flex flex-col h-[90%]">
+        {/* XY */}
         <div className="flex-1 flex justify-center relative">
           <canvas
             ref={canvasXY}
@@ -335,12 +336,6 @@ export default function OrthographicViewer({
                     panXY={panXY}
                     canvasRef={canvasXY as React.RefObject<HTMLCanvasElement>}
                     onUpdate={(id, text, newPos, save) => {
-                      console.log("AnnotationTextBox onUpdate:", {
-                        id,
-                        text,
-                        newPos,
-                        save,
-                      });
                       const updatedAnnotation = annotations.find(
                         (ann) => ann._id === id || ann.id === id
                       );
@@ -352,18 +347,14 @@ export default function OrthographicViewer({
                         };
                         setAnnotations((prev) =>
                           prev.map((ann) =>
-                            ann._id === id || ann.id === id
-                              ? newAnnotation
-                              : ann
+                            ann._id === id || ann.id === id ? newAnnotation : ann
                           )
                         );
                         if (save && text && text.trim() !== "") {
                           saveAnnotationToMongoDB(newAnnotation, !!newPos);
                         } else if (save) {
                           setAnnotations((prev) =>
-                            prev.filter(
-                              (ann) => ann._id !== id && ann.id !== id
-                            )
+                            prev.filter((ann) => ann._id !== id && ann.id !== id)
                           );
                         }
                       }
@@ -372,6 +363,8 @@ export default function OrthographicViewer({
                 )
             )}
         </div>
+
+        {/* XZ */}
         <div className="flex-1 flex justify-center relative">
           <canvas
             ref={canvasXZ}
@@ -400,12 +393,6 @@ export default function OrthographicViewer({
                     panXY={panXZ}
                     canvasRef={canvasXZ as React.RefObject<HTMLCanvasElement>}
                     onUpdate={(id, text, newPos, save) => {
-                      console.log("AnnotationTextBox onUpdate:", {
-                        id,
-                        text,
-                        newPos,
-                        save,
-                      });
                       const updatedAnnotation = annotations.find(
                         (ann) => ann._id === id || ann.id === id
                       );
@@ -417,18 +404,14 @@ export default function OrthographicViewer({
                         };
                         setAnnotations((prev) =>
                           prev.map((ann) =>
-                            ann._id === id || ann.id === id
-                              ? newAnnotation
-                              : ann
+                            ann._id === id || ann.id === id ? newAnnotation : ann
                           )
                         );
                         if (save && text && text.trim() !== "") {
                           saveAnnotationToMongoDB(newAnnotation, !!newPos);
                         } else if (save) {
                           setAnnotations((prev) =>
-                            prev.filter(
-                              (ann) => ann._id !== id && ann.id !== id
-                            )
+                            prev.filter((ann) => ann._id !== id && ann.id !== id)
                           );
                         }
                       }
@@ -437,6 +420,8 @@ export default function OrthographicViewer({
                 )
             )}
         </div>
+
+        {/* YZ */}
         <div className="flex-1 flex justify-center relative">
           <canvas
             ref={canvasYZ}
@@ -465,12 +450,6 @@ export default function OrthographicViewer({
                     panXY={panYZ}
                     canvasRef={canvasYZ as React.RefObject<HTMLCanvasElement>}
                     onUpdate={(id, text, newPos, save) => {
-                      console.log("AnnotationTextBox onUpdate:", {
-                        id,
-                        text,
-                        newPos,
-                        save,
-                      });
                       const updatedAnnotation = annotations.find(
                         (ann) => ann._id === id || ann.id === id
                       );
@@ -482,18 +461,14 @@ export default function OrthographicViewer({
                         };
                         setAnnotations((prev) =>
                           prev.map((ann) =>
-                            ann._id === id || ann.id === id
-                              ? newAnnotation
-                              : ann
+                            ann._id === id || ann.id === id ? newAnnotation : ann
                           )
                         );
                         if (save && text && text.trim() !== "") {
                           saveAnnotationToMongoDB(newAnnotation, !!newPos);
                         } else if (save) {
                           setAnnotations((prev) =>
-                            prev.filter(
-                              (ann) => ann._id !== id && ann.id !== id
-                            )
+                            prev.filter((ann) => ann._id !== id && ann.id !== id)
                           );
                         }
                       }
@@ -503,14 +478,17 @@ export default function OrthographicViewer({
             )}
         </div>
       </div>
+
       <p className="absolute top-4 right-4 text-gray-500 text-sm">
         Zoom: {zoomXY.toFixed(2)}x {zoomXZ.toFixed(2)}x {zoomYZ.toFixed(2)}x
       </p>
+
       {activePixelColor && (
         <div className="absolute bottom-4 right-4 px-2 py-1 rounded-md text-sm opacity-85 bg-white dark:bg-gray-800">
           {activePixelColor.view}: {activePixelColor.color}
         </div>
       )}
+
       <AnnotationPanel
         isAnnotating={isAnnotating}
         showAnnotations={showAnnotations}
@@ -521,16 +499,23 @@ export default function OrthographicViewer({
         onToggleVisibility={() => setShowAnnotations((prev) => !prev)}
         onOpenModal={() => setShowModal(true)}
       />
+
       <MeasureToggleButton
         isMeasuring={isMeasuring}
         onToggle={handleToggleMeasureWrapper}
       />
+
       <XYZControls
         coords={coords}
         onChange={handleSlider}
-        limits={{ x: (brightfieldNumX || fluorescentNumX) - 1, y: (brightfieldNumY || fluorescentNumY) - 1, z: (brightfieldNumZ || fluorescentNumZ) - 1 }}
+        limits={{
+          x: (brightfieldNumX || fluorescentNumX) - 1,
+          y: (brightfieldNumY || fluorescentNumY) - 1,
+          z: (brightfieldNumZ || fluorescentNumZ) - 1,
+        }}
         onReset={handleReset}
       />
+
       <ViewControlPanel
         coords={coords}
         zoom={{ XY: zoomXY, XZ: zoomXZ, YZ: zoomYZ }}
@@ -544,15 +529,18 @@ export default function OrthographicViewer({
         setErrorMessage={setErrorMessage}
         datasetId={datasetId}
       />
-      <MediaControlPanel
-        datasetId={datasetId}
-        setErrorMessage={setErrorMessage}
-      />
+
+      <MediaControlPanel datasetId={datasetId} setErrorMessage={setErrorMessage} />
+
       {isMeasuring && (
         <p className="absolute bottom-20 left-20 text-white bg-black/60 px-2 py-1 rounded text-sm">
           Click twice in any plane (XY, XZ, YZ) to display a measurement in µm.
         </p>
       )}
+    </div>
+  ) : (
+    <div className="h-full w-full p-4 flex items-center justify-center">
+      <p className="text-red-500">Error: Please select a dataset to view.</p>
     </div>
   );
 }

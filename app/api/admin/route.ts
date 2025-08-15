@@ -45,7 +45,8 @@ export async function POST(request: Request) {
         try {
           const result = await createDataset(data);
           return NextResponse.json({ success: true, id: result.insertedId.toString() });
-        } catch (error: any) {
+        } catch (error: unknown) {
+          
           console.error("Error creating dataset:", error);
           return NextResponse.json({ success: false, error: error.message }, { status: 400 });
         }

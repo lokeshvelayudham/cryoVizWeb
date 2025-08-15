@@ -22,9 +22,8 @@ interface ManageUsersDialogProps {
   institutions: Institution[];
   handleRemoveUser: (userId: string, datasetId: string) => void;
   handleAssignUsersSubmit: () => void;
-  handleUserSelection: (userId: string) => void;
-  handleManageUsers: (dataset: Dataset) => void;
-  setSelectedInstitutions: (institutions: string[]) => void; // New prop to update institutions
+  handleUserSelection: (userId: string) => void;  
+  setSelectedInstitutions: (institutions: string[]) => void; 
 }
 
 export default function ManageUsersDialog({
@@ -38,7 +37,6 @@ export default function ManageUsersDialog({
   handleRemoveUser,
   handleAssignUsersSubmit,
   handleUserSelection,
-  handleManageUsers,
   setSelectedInstitutions,
 }: ManageUsersDialogProps) {
   const handleInstitutionChange = (value: string) => {

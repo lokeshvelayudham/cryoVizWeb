@@ -17,16 +17,7 @@ interface Institution {
   name: string;
 }
 
-interface User {
-  _id?: string;
-  name: string;
-  email: string;
-  accessLevel: "admin" | "user";
-  institutionId: string;
-  logins?: number;
-  lastLogin?: Date;
-  assignedDatasets?: string[];
-}
+
 
 const formSchema = z.object({
   _id: z.string().optional(),

@@ -20,22 +20,14 @@ import ShaderSelector from "./ShaderSelector";
 
 const VolumeViewerPng: React.FC<{
   brightfieldBlobUrl: string;
-  datasetId: string;
   brightfieldNumZ: number;
-  brightfieldNumY: number;
-  brightfieldNumX: number;
   fluorescentNumZ: number;
-  fluorescentNumY: number;
-  fluorescentNumX: number;
+  datasetId: string;
 }> = ({
   brightfieldBlobUrl,
-  datasetId,
   brightfieldNumZ,
-  brightfieldNumY,
-  brightfieldNumX,
   fluorescentNumZ,
-  fluorescentNumY,
-  fluorescentNumX,
+  datasetId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [clip, setClip] = useState({ x: 0, y: 0, z: 0 });

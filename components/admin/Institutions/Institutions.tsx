@@ -73,7 +73,7 @@ export default function Institutions() {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedInstitution, setSelectedInstitution] =
     useState<Institution | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  const [, setUsers] = useState<User[]>([]);
 
   const fetchInstitutions = async () => {
     setLoading(true);

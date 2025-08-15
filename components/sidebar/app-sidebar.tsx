@@ -7,7 +7,6 @@ import {
   LifeBuoy,
   Send,
   Frame,
-  Map as MapIcon,
   CornerDownRight,
   Lock,
 } from "lucide-react";
@@ -32,10 +31,6 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-
-// Helper: build link to viewer
-const datasetLink = (id?: string | null) =>
-  id ? `/home?datasetId=${id}` : "#";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
@@ -186,13 +181,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: parentItem.title,
           url: parentItem.hasAccess ? `/home?datasetId=${parentItem.id}` : "#",
-          // icon: MapIcon,
           items: mappingChildren.map((c) => ({
             title: c.title,
             url: c.hasAccess ? `/home?datasetId=${c.id}` : "#",
             icon: c.hasAccess ? CornerDownRight : Lock,
-            // add a lock icon only if you want to visually indicate no access
-            // icon: c.hasAccess ? undefined : Lock,
           })),
         },
       ]
@@ -218,8 +210,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       title: "Datasets",
       url: "/users_datasets",
-      icon: Bot,
-      // Inject the mapping tree under Datasets (only when we have a parent to show)
+      icon: Bot,  
       items: mappingNavItems,
     },
   ];

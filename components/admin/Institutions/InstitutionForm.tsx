@@ -12,18 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface Institution {
-  _id?: string;
-  name: string;
-  abbr: string;
-  type: "Industry" | "Government" | "Academic" | "Others";
-  address: string;
-  phone: string;
-  email: string;
-  website: string;
-  status: "Active" | "Inactive" | "Hold";
-  createdAt?: Date;
-}
+
 
 const formSchema = z.object({
   _id: z.string().optional(),

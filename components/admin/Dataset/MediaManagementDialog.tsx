@@ -47,7 +47,7 @@ export default function MediaManagementDialog({
     },
   });
 
-  const { reset: resetMedia, handleSubmit: handleMediaSubmit, watch } = mediaMethods;
+  const { reset: resetMedia, handleSubmit: handleMediaSubmit } = mediaMethods;
 
   useEffect(() => {
     if (isOpen && selectedDataset?._id) {

@@ -8,60 +8,46 @@ export function SessionRecovery() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const [recoveryAttempted, setRecoveryAttempted] = useState(false);
+  const [recoveryStage, setRecoveryStage] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAndRecoverSession = async () => {
-      // Only attempt recovery once per page load
-      if (status === "unauthenticated" && !recoveryAttempted) {
-        setRecoveryAttempted(true);
-        console.log("SessionRecovery: Attempting to recover session...");
-        
-        try {
-          // Check if server has a session
-          const response = await fetch("/api/debug-session");
-          const debugData = await response.json();
-          
+    // DISABLED AUTO-RECOVERY TO PREVENT INFINITE LOOPS
+    // Only attempt recovery once per page load and ONLY log the issue
+    if (status === "unauthenticated" && !recoveryAttempted) {
+      setRecoveryAttempted(true);
+      console.log("SessionRecovery: Session sync issue detected - manual intervention required");
+      
+      // Check if server has a session for debugging
+      fetch("/api/debug-session")
+        .then(response => response.json())
+        .then(debugData => {
           if (debugData.sessionExists && !session) {
-            console.log("SessionRecovery: Server has session, forcing client refresh...");
+            console.log("SessionRecovery: Server has session but client doesn't - use manual refresh");
+            setRecoveryStage("Session sync issue detected");
             
-            // Multiple recovery strategies
-            // Strategy 1: Force session update
-            await update();
-            
-            // Strategy 2: If update doesn't work, try a more aggressive approach
-            setTimeout(async () => {
-              if (status === "unauthenticated") {
-                console.log("SessionRecovery: Trying aggressive recovery...");
-                // Clear any cached session data and force re-fetch
-                await fetch("/api/auth/session", { 
-                  method: "GET", 
-                  cache: "no-store",
-                  headers: { "Cache-Control": "no-cache" }
-                });
-                await update();
-                
-                // Strategy 3: Last resort - hard refresh
-                setTimeout(() => {
-                  if (status === "unauthenticated") {
-                    console.log("SessionRecovery: Hard refresh required - redirecting...");
-                    window.location.href = window.location.pathname + window.location.search;
-                  }
-                }, 1000);
-              }
-            }, 1000);
+            // Clear the stage after 3 seconds to not clutter UI
+            setTimeout(() => {
+              setRecoveryStage(null);
+            }, 3000);
           }
-        } catch (error) {
+        })
+        .catch(error => {
           console.error("SessionRecovery: Error checking session:", error);
-        }
-      }
-    };
-
-    // Only run if we're in an unauthenticated state
-    if (status === "unauthenticated") {
-      checkAndRecoverSession();
+        });
     }
   }, [status, session, update, router]);
 
-  // This component doesn't render anything
+  // Show recovery status if in progress
+  if (recoveryStage) {
+    return (
+      <div className="fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+        <div className="flex items-center gap-2">
+          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+          <span className="text-sm">{recoveryStage}</span>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 }

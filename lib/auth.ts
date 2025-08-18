@@ -140,11 +140,15 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.sub as string;
-        session.user.accessLevel = token.accessLevel;
+        session.user.accessLevel = token.accessLevel as string;
         // Ensure name is set properly
         if (!session.user.name && session.user.email) {
           session.user.name = session.user.email;
         }
+      }
+      // Log session creation for debugging
+      if (process.env.NODE_ENV === "production") {
+        console.log("NextAuth session callback - User:", session.user?.email);
       }
       return session;
     },

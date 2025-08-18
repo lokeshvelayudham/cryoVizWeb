@@ -37,7 +37,7 @@ type MappingView = {
 
 export default function UsersDatasets() {
   // const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
 
   // Debug session in production
   React.useEffect(() => {
@@ -45,6 +45,13 @@ export default function UsersDatasets() {
     console.log("UsersDatasets - Session data:", session);
     console.log("UsersDatasets - Cookies:", document.cookie);
   }, [status, session]);
+
+  // Force session refresh function
+  const handleRefreshSession = async () => {
+    console.log("Manually refreshing session...");
+    await update();
+    window.location.reload();
+  };
 
   // // Redirect unauthenticated users (effect is fine; it's not a hook count issue)
   // React.useEffect(() => {
@@ -271,9 +278,24 @@ export default function UsersDatasets() {
         <div className="mb-4 text-sm text-red-500">Error loading data: {errorMsg}</div>
       )}
       {status === "unauthenticated" && (
-        <div className="mb-4 text-sm text-muted-foreground">
-          Session not found. Please refresh the page or{" "}
-          <a href="/auth/login" className="underline">login again</a>.
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="text-sm text-yellow-800 mb-2">
+            Session not found. This might be a synchronization issue.
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={handleRefreshSession}
+              className="px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
+            >
+              Refresh Session
+            </button>
+            <a 
+              href="/auth/login" 
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+            >
+              Login Again
+            </a>
+          </div>
         </div>
       )}
       {status === "loading" && (

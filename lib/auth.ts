@@ -119,7 +119,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
-    updateAge: 24 * 60 * 60, // 24 hours
+    updateAge: 5 * 60, // Update every 5 minutes for better session persistence
   },
   jwt: {
     secret: process.env.NEXTAUTH_SECRET!,
@@ -161,6 +161,20 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development", // Enable debug in development
+  logger: {
+    error(code, metadata) {
+      console.error("NextAuth Error:", code, metadata);
+    },
+    warn(code) {
+      console.warn("NextAuth Warning:", code);
+    },
+    debug(code, metadata) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("NextAuth Debug:", code, metadata);
+      }
+    },
+  },
 };
 
 // Required: for both GET/POST and session-based auth

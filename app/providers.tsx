@@ -19,9 +19,10 @@ export function Providers({ children, session }: { children: React.ReactNode, se
   return (
     <SessionProvider 
       session={session} 
-      refetchInterval={2 * 60} // Check every 2 minutes instead of 5
+      refetchInterval={60} // Check every 1 minute for better session recovery
       refetchOnWindowFocus={true} // Re-enable focus refresh for better session recovery
       refetchWhenOffline={false}
+      basePath="/api/auth" // Explicitly set the auth base path
     >
       <QueryClientProvider client={queryClient}>
         <ThemeProvider

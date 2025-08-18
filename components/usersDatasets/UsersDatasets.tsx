@@ -39,6 +39,13 @@ export default function UsersDatasets() {
   // const router = useRouter();
   const { data: session, status } = useSession();
 
+  // Debug session in production
+  React.useEffect(() => {
+    console.log("UsersDatasets - Session status:", status);
+    console.log("UsersDatasets - Session data:", session);
+    console.log("UsersDatasets - Cookies:", document.cookie);
+  }, [status, session]);
+
   // // Redirect unauthenticated users (effect is fine; it's not a hook count issue)
   // React.useEffect(() => {
   //   if (status === "unauthenticated") {

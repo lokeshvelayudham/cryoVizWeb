@@ -39,9 +39,14 @@ export async function POST(req: Request) {
   // Set token cookie with proper configuration for Vercel
   const cookieStore = await cookies();
   const isProduction = process.env.NODE_ENV === "production";
+  
+  // Use the same cookie name pattern as NextAuth.js
   const cookieName = isProduction 
     ? "__Secure-next-auth.session-token" 
     : "next-auth.session-token";
+    
+  // Log cookie setting for debugging
+  console.log(`Setting cookie: ${cookieName} for ${email} in ${process.env.NODE_ENV}`);
     
   cookieStore.set(cookieName, token, {
     httpOnly: true,
@@ -49,7 +54,7 @@ export async function POST(req: Request) {
     sameSite: "lax",
     path: "/",
     maxAge: 7 * 24 * 60 * 60, // 7 days to match session maxAge
-    domain: isProduction ? undefined : undefined, // Let browser determine domain
+    // Don't set domain - let NextAuth.js handle this
   });
 
   return NextResponse.json({ success: true });

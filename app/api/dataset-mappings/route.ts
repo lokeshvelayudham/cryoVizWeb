@@ -8,6 +8,9 @@ import {
   deleteDatasetMapping,
 } from "@/lib/models";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type DatasetChild = { datasetId: string };
 
 interface CreateMappingBody {

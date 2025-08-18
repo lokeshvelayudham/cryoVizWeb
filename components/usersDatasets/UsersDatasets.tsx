@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { Dataset, Institution, User, DatasetMapping } from "@/lib/models";
@@ -36,15 +36,15 @@ type MappingView = {
 };
 
 export default function UsersDatasets() {
-  const router = useRouter();
+  // const router = useRouter();
   const { data: session, status } = useSession();
 
-  // Redirect unauthenticated users (effect is fine; it's not a hook count issue)
-  React.useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/login");
-    }
-  }, [status, router]);
+  // // Redirect unauthenticated users (effect is fine; it's not a hook count issue)
+  // React.useEffect(() => {
+  //   if (status === "unauthenticated") {
+  //     router.push("/auth/login");
+  //   }
+  // }, [status, router]);
 
   // Queries: always *declare* them. Use `enabled` to avoid network calls, but don't conditionally skip hook calls.
   const {

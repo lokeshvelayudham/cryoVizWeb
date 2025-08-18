@@ -21,7 +21,7 @@ import UsersDatasets from "@/components/usersDatasets/UsersDatasets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const runtime = "nodejs"; // (optional but safe if any provider needs Node APIs)
+// export const runtime = "nodejs"; // (optional but safe if any provider needs Node APIs)
 
 export default async function UsersPage() {
   const session = await getServerSession(authOptions);

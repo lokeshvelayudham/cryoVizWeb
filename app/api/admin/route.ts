@@ -17,6 +17,10 @@ import {
 } from "@/lib/models";
 import type { Dataset, Institution, User } from "@/lib/models";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+
 // ---------- utils ----------
 const isObj = (x: unknown): x is Record<string, unknown> =>
   !!x && typeof x === "object";

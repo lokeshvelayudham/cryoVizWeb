@@ -17,7 +17,12 @@ const queryClient = new QueryClient({
 
 export function Providers({ children, session }: { children: React.ReactNode, session: Session | null }) {
   return (
-    <SessionProvider session={session} refetchInterval={5 * 60} refetchOnWindowFocus={false}>
+    <SessionProvider 
+      session={session} 
+      refetchInterval={2 * 60} // Check every 2 minutes instead of 5
+      refetchOnWindowFocus={true} // Re-enable focus refresh for better session recovery
+      refetchWhenOffline={false}
+    >
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
           attribute="class"

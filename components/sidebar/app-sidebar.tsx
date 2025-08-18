@@ -228,10 +228,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   const user = {
-    name: session?.user?.name || "User",
+    name: session?.user?.name || session?.user?.email || "User",
     email: session?.user?.email || "",
     avatar: "/placeholder-user.jpg",
   };
+
+  // Debug logging for production issues
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production") {
+      console.log("AppSidebar - Session status:", status);
+      console.log("AppSidebar - Session user:", session?.user);
+      console.log("AppSidebar - User access level:", userAccessLevel);
+    }
+  }, [status, session, userAccessLevel]);
 
   if (loading) {
     return (

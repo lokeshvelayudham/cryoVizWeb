@@ -264,7 +264,13 @@ export default function UsersDatasets() {
         <div className="mb-4 text-sm text-red-500">Error loading data: {errorMsg}</div>
       )}
       {status === "unauthenticated" && (
-        <div className="mb-4 text-sm text-muted-foreground">Redirecting to login…</div>
+        <div className="mb-4 text-sm text-muted-foreground">
+          Session not found. Please refresh the page or{" "}
+          <a href="/auth/login" className="underline">login again</a>.
+        </div>
+      )}
+      {status === "loading" && (
+        <div className="mb-4 text-sm text-muted-foreground">Loading session...</div>
       )}
 
       {/* Controls */}

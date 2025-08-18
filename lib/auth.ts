@@ -123,6 +123,7 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     secret: process.env.NEXTAUTH_SECRET!,
+    maxAge: 7 * 24 * 60 * 60, // 7 days to match session maxAge
   },
   
   adapter: MongoDBAdapter(clientPromise),
@@ -140,6 +141,10 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         session.user.id = token.sub as string;
         session.user.accessLevel = token.accessLevel;
+        // Ensure name is set properly
+        if (!session.user.name && session.user.email) {
+          session.user.name = session.user.email;
+        }
       }
       return session;
     },

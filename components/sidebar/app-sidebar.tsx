@@ -230,7 +230,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const user = {
     name: session?.user?.name || session?.user?.email || "User",
     email: session?.user?.email || "",
-    avatar: "/placeholder-user.jpg",
+    avatar: session?.user?.image || "",
   };
 
   // Debug logging for production issues

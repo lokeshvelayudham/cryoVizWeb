@@ -1,17 +1,19 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useSession, signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export function SessionRecovery() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
+  const [recoveryAttempted, setRecoveryAttempted] = useState(false);
 
   useEffect(() => {
     const checkAndRecoverSession = async () => {
-      // If client thinks we're unauthenticated, but we might have server session
-      if (status === "unauthenticated") {
+      // Only attempt recovery once per page load
+      if (status === "unauthenticated" && !recoveryAttempted) {
+        setRecoveryAttempted(true);
         console.log("SessionRecovery: Attempting to recover session...");
         
         try {
@@ -21,15 +23,32 @@ export function SessionRecovery() {
           
           if (debugData.sessionExists && !session) {
             console.log("SessionRecovery: Server has session, forcing client refresh...");
-            // Force session update
+            
+            // Multiple recovery strategies
+            // Strategy 1: Force session update
             await update();
-            // If that doesn't work, refresh the page
-            setTimeout(() => {
+            
+            // Strategy 2: If update doesn't work, try a more aggressive approach
+            setTimeout(async () => {
               if (status === "unauthenticated") {
-                console.log("SessionRecovery: Manual refresh required");
-                router.refresh();
+                console.log("SessionRecovery: Trying aggressive recovery...");
+                // Clear any cached session data and force re-fetch
+                await fetch("/api/auth/session", { 
+                  method: "GET", 
+                  cache: "no-store",
+                  headers: { "Cache-Control": "no-cache" }
+                });
+                await update();
+                
+                // Strategy 3: Last resort - hard refresh
+                setTimeout(() => {
+                  if (status === "unauthenticated") {
+                    console.log("SessionRecovery: Hard refresh required - redirecting...");
+                    window.location.href = window.location.pathname + window.location.search;
+                  }
+                }, 1000);
               }
-            }, 2000);
+            }, 1000);
           }
         } catch (error) {
           console.error("SessionRecovery: Error checking session:", error);

@@ -49,8 +49,29 @@ export default function UsersDatasets() {
   // Force session refresh function
   const handleRefreshSession = async () => {
     console.log("Manually refreshing session...");
-    await update();
-    window.location.reload();
+    // Try multiple approaches for session recovery
+    try {
+      // Clear any cached session
+      await fetch("/api/auth/session", { 
+        method: "GET", 
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
+      
+      // Force session update
+      await update();
+      
+      // If still not working, hard refresh
+      setTimeout(() => {
+        if (status === "unauthenticated") {
+          window.location.href = window.location.pathname + window.location.search;
+        }
+      }, 1000);
+    } catch (error) {
+      console.error("Manual session refresh error:", error);
+      // Fallback to hard refresh
+      window.location.href = window.location.pathname + window.location.search;
+    }
   };
 
   // // Redirect unauthenticated users (effect is fine; it's not a hook count issue)

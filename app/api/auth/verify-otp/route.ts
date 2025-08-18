@@ -36,26 +36,39 @@ export async function POST(req: Request) {
     secret: process.env.NEXTAUTH_SECRET!,
   });
 
-  // Set token cookie with proper configuration for Vercel
+  // EXPERIMENTAL: Try setting cookies with multiple approaches for Vercel compatibility
   const cookieStore = await cookies();
   const isProduction = process.env.NODE_ENV === "production";
   
-  // Use the same cookie name pattern as NextAuth.js
-  const cookieName = isProduction 
-    ? "__Secure-next-auth.session-token" 
-    : "next-auth.session-token";
-    
-  // Log cookie setting for debugging
-  console.log(`Setting cookie: ${cookieName} for ${email} in ${process.env.NODE_ENV}`);
-    
-  cookieStore.set(cookieName, token, {
+  console.log(`Setting cookies for ${email} in ${process.env.NODE_ENV} environment`);
+  
+  // Set both cookie variants to ensure compatibility
+  const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
     maxAge: 7 * 24 * 60 * 60, // 7 days to match session maxAge
-    // Don't set domain - let NextAuth.js handle this
-  });
+  };
+  
+  if (isProduction) {
+    // Production: Set secure cookies
+    cookieStore.set("__Secure-next-auth.session-token", token, cookieOptions);
+    console.log("Set __Secure-next-auth.session-token for production");
+  } else {
+    // Development: Set non-secure cookies
+    cookieStore.set("next-auth.session-token", token, cookieOptions);
+    console.log("Set next-auth.session-token for development");
+  }
+  
+  // EXPERIMENTAL: Also try setting a non-httpOnly version for client access testing
+  if (isProduction) {
+    cookieStore.set("__Secure-next-auth.session-token-readable", token, {
+      ...cookieOptions,
+      httpOnly: false, // Allow client-side access for debugging
+    });
+    console.log("Set readable session token for debugging");
+  }
 
   return NextResponse.json({ success: true });
 }

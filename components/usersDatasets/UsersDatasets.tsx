@@ -43,7 +43,16 @@ export default function UsersDatasets() {
   React.useEffect(() => {
     console.log("UsersDatasets - Session status:", status);
     console.log("UsersDatasets - Session data:", session);
-    console.log("UsersDatasets - Cookies:", document.cookie);
+    console.log("UsersDatasets - All cookies:", document.cookie);
+    
+    // Check specifically for NextAuth cookies
+    const cookies = document.cookie.split(';').map(c => c.trim());
+    const authCookies = cookies.filter(c => c.includes('next-auth') || c.includes('__Secure-next-auth'));
+    console.log("UsersDatasets - Auth cookies found:", authCookies);
+    
+    // Check if we can see session token specifically
+    const sessionToken = cookies.find(c => c.includes('session-token'));
+    console.log("UsersDatasets - Session token cookie:", sessionToken ? "FOUND" : "NOT FOUND");
   }, [status, session]);
 
   // Force session refresh function

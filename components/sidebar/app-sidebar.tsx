@@ -45,7 +45,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const run = async () => {
       if (status === "loading") return;
       if (status === "unauthenticated" || !session?.user?.email) {
-        router.push("/auth/login");
+        // Don't redirect here - let the server-side auth handle redirects
+        // This prevents double login redirects
+        setLoadingGate(false);
         return;
       }
       try {
@@ -56,8 +58,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         if (!currentUser) throw new Error("User not found");
         setUserAccessLevel(currentUser.accessLevel);
       } catch (e) {
-        console.error(e);
-        router.push("/auth/login");
+        console.error("AppSidebar: Failed to fetch user data:", e);
+        // Don't redirect on API failures - just log the error
+        // The server-side auth will handle authentication redirects
+        setUserAccessLevel(null);
       } finally {
         setLoadingGate(false);
       }
@@ -256,6 +260,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarContent>
           <div className="p-4 text-sm text-muted-foreground">Loading…</div>
         </SidebarContent>
+      </Sidebar>
+    );
+  }
+
+  // If user is authenticated but we couldn't fetch admin data, show basic sidebar
+  if (status === "authenticated" && !adminData && !isLoadingAdmin) {
+    return (
+      <Sidebar variant="inset" {...props}>
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <a href="#">
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
+                    <img
+                      src="/images/biv-logo.png"
+                      alt="CryoViz Logo"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">BioInvision Inc</span>
+                    <span className="truncate text-xs">CryoViz™ Web</span>
+                  </div>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <div className="p-4 text-sm text-muted-foreground">
+            Unable to load user data. Please refresh the page.
+          </div>
+        </SidebarContent>
+        <SidebarFooter>
+          <NavUser user={user} />
+          <ModeToggle />
+        </SidebarFooter>
       </Sidebar>
     );
   }

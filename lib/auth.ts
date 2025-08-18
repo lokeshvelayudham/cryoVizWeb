@@ -6,6 +6,29 @@ import nodemailer from "nodemailer";
 import { randomInt } from "crypto";
 import NextAuth from "next-auth";
 
+// Extend the built-in session types
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+      accessLevel?: string;
+    };
+  }
+
+  interface User {
+    accessLevel?: string;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessLevel?: string;
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     EmailProvider({
@@ -95,9 +118,8 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 30 * 60,
-    updateAge: 24 * 60 * 60,
-    
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   jwt: {
     secret: process.env.NEXTAUTH_SECRET!,
@@ -106,6 +128,32 @@ export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   pages: {
     signIn: "/auth/login",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user && 'accessLevel' in user) {
+        token.accessLevel = user.accessLevel as string;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.sub as string;
+        session.user.accessLevel = token.accessLevel;
+      }
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch {
+        // If URL parsing fails, return baseUrl
+      }
+      return baseUrl;
+    },
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

@@ -7,12 +7,18 @@ import { ThemeProvider } from "@/components/theme-provider";
 import type { Session } from "next-auth";
 
 // Create a QueryClient instance
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minute
+    },
+  },
+});
 
 export function Providers({ children, session }: { children: React.ReactNode, session: Session | null }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionProvider session={session}>
+    <SessionProvider session={session} refetchInterval={5 * 60} refetchOnWindowFocus={false}>
+      <QueryClientProvider client={queryClient}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -21,7 +27,7 @@ export function Providers({ children, session }: { children: React.ReactNode, se
         >
           {children}
         </ThemeProvider>
-      </SessionProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </SessionProvider>
   );
 }

@@ -1,24 +1,20 @@
 import "@/app/globals.css";
-import { ThemeProvider } from "@/components/theme-provider"
-import ReactQueryProvider from "@/components/providers/ReactQueryProvider";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { Providers } from "@/app/providers";
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <ReactQueryProvider>
-            {children}
-          </ReactQueryProvider>
-        </ThemeProvider>
+        <Providers session={session}>
+          {children}
+        </Providers>
       </body>
     </html>
   );

@@ -36,13 +36,18 @@ export async function POST(req: Request) {
     secret: process.env.NEXTAUTH_SECRET!,
   });
 
-  // Set token cookie
+  // Set token cookie with proper configuration for Vercel
   const cookieStore = await cookies();
-  cookieStore.set("next-auth.session-token", token, {
+  const cookieName = process.env.NODE_ENV === "production" 
+    ? "__Secure-next-auth.session-token" 
+    : "next-auth.session-token";
+    
+  cookieStore.set(cookieName, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    maxAge: 7 * 24 * 60 * 60, // 7 days to match session maxAge
   });
 
   return NextResponse.json({ success: true });

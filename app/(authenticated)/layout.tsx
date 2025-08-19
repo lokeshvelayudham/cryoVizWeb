@@ -1,6 +1,6 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
+import { SessionSync } from "@/components/SessionSync";
 
 export default function AuthenticatedLayout({
   children,
@@ -8,8 +8,9 @@ export default function AuthenticatedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SessionProvider>
+    <>
+      <SessionSync />
       {children}
-    </SessionProvider>
+    </>
   );
 }

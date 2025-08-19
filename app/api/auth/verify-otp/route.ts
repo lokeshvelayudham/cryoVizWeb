@@ -19,56 +19,60 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-    // Update logins and lastLogin
-    await updateUserLastLogin(user._id.toString());
+  // Update logins and lastLogin
+  await updateUserLastLogin(user._id.toString());
 
   // Clean up OTP
   await db.collection("otps").deleteMany({ email });
 
-  // Create JWT token
+  // Create JWT token with proper NextAuth format
+  const now = Math.floor(Date.now() / 1000);
   const token = await encode({
     token: {
       name: user.name || user.email,
       email: user.email,
       sub: user._id.toString(),
       accessLevel: user.accessLevel,
+      iat: now,
+      exp: now + (7 * 24 * 60 * 60), // 7 days
+      jti: crypto.randomUUID(), // Add unique identifier
     },
     secret: process.env.NEXTAUTH_SECRET!,
   });
 
-  // EXPERIMENTAL: Try setting cookies with multiple approaches for Vercel compatibility
+  // Set session cookie with proper NextAuth naming
   const cookieStore = await cookies();
   const isProduction = process.env.NODE_ENV === "production";
   
-  console.log(`Setting cookies for ${email} in ${process.env.NODE_ENV} environment`);
+  const cookieName = isProduction 
+    ? "__Secure-next-auth.session-token" 
+    : "next-auth.session-token";
   
-  // Set both cookie variants to ensure compatibility
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: 7 * 24 * 60 * 60, // 7 days to match session maxAge
+    maxAge: 7 * 24 * 60 * 60, // 7 days
   };
   
-  if (isProduction) {
-    // Production: Set secure cookies
-    cookieStore.set("__Secure-next-auth.session-token", token, cookieOptions);
-    console.log("Set __Secure-next-auth.session-token for production");
-  } else {
-    // Development: Set non-secure cookies
-    cookieStore.set("next-auth.session-token", token, cookieOptions);
-    console.log("Set next-auth.session-token for development");
-  }
+  cookieStore.set(cookieName, token, cookieOptions);
   
-  // EXPERIMENTAL: Also try setting a non-httpOnly version for client access testing
-  if (isProduction) {
-    cookieStore.set("__Secure-next-auth.session-token-readable", token, {
-      ...cookieOptions,
-      httpOnly: false, // Allow client-side access for debugging
-    });
-    console.log("Set readable session token for debugging");
-  }
+  console.log(`✅ Session cookie set: ${cookieName} for ${email}`);
+  console.log(`🔧 Cookie options:`, cookieOptions);
+  console.log(`🎫 Token length:`, token.length);
+  
+  // Verify the cookie was set by trying to read it back
+  const setCookie = cookieStore.get(cookieName);
+  console.log(`🔍 Cookie verification:`, setCookie ? 'FOUND' : 'NOT FOUND');
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ 
+    success: true,
+    debug: {
+      cookieName,
+      cookieSet: !!setCookie,
+      tokenLength: token.length,
+      environment: process.env.NODE_ENV
+    }
+  });
 }

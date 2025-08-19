@@ -119,7 +119,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
-    updateAge: 5 * 60, // Update every 5 minutes for better session persistence
+    updateAge: 24 * 60 * 60, // Update every 24 hours (less frequent to avoid issues)
   },
   jwt: {
     secret: process.env.NEXTAUTH_SECRET!,
@@ -131,10 +131,22 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user}) {
+      // If this is the first time the JWT is created (sign in)
       if (user && 'accessLevel' in user) {
         token.accessLevel = user.accessLevel as string;
       }
+      
+      // Ensure token has required fields for persistence
+      if (!token.sub && user?.id) {
+        token.sub = user.id;
+      }
+      
+      // Add timestamp for debugging
+      if (process.env.NODE_ENV === "development") {
+        token.lastUpdated = Date.now();
+      }
+      
       return token;
     },
     async session({ session, token }) {

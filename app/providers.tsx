@@ -16,11 +16,21 @@ const queryClient = new QueryClient({
 });
 
 export function Providers({ children, session }: { children: React.ReactNode, session: Session | null }) {
+  // Debug session passing from server to client
+  React.useEffect(() => {
+    console.log("🔄 Providers - Server session passed to client:", session);
+    console.log("🔄 Providers - Session exists:", !!session);
+    if (session) {
+      console.log("🔄 Providers - Session user:", session.user);
+      console.log("🔄 Providers - Session expires:", session.expires);
+    }
+  }, [session]);
+
   return (
     <SessionProvider 
       session={session} 
-      refetchInterval={30} // Check every 30 seconds for faster recovery
-      refetchOnWindowFocus={true} // Re-enable focus refresh for better session recovery
+      refetchInterval={0} // Disable automatic refetching to prevent session loss
+      refetchOnWindowFocus={false} // Disable focus refresh to prevent session interruption
       refetchWhenOffline={false}
       basePath="/api/auth" // Explicitly set the auth base path
     >

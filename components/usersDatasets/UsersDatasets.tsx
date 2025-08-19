@@ -39,12 +39,22 @@ export default function UsersDatasets() {
   // const router = useRouter();
   const { data: session, status  } = useSession();
 
-  // Debug session in production (simplified)
+  // Debug session and cookies
   React.useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("UsersDatasets - Session status:", status);
-      console.log("UsersDatasets - Session data:", session);
-    }
+    console.log("UsersDatasets - Session status:", status);
+    console.log("UsersDatasets - Session data:", session);
+    console.log("UsersDatasets - All cookies:", document.cookie);
+    
+    // Check for specific NextAuth cookies
+    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+      const [name, value] = cookie.trim().split('=');
+      if (name.includes('next-auth')) {
+        acc[name] = value ? 'EXISTS' : 'EMPTY';
+      }
+      return acc;
+    }, {} as Record<string, string>);
+    
+    console.log("UsersDatasets - NextAuth cookies:", cookies);
   }, [status, session]);
 
 
@@ -267,15 +277,36 @@ export default function UsersDatasets() {
       )}
       {status === "unauthenticated" && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="text-sm text-blue-800 mb-2">
+          <div className="text-sm text-blue-800 mb-3">
             Please log in to access your datasets.
           </div>
-          <a 
-            href="/auth/login" 
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-          >
-            Login
-          </a>
+          <div className="flex gap-2 mb-3">
+            <a 
+              href="/auth/login" 
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+            >
+              Login
+            </a>
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/test-session');
+                  const data = await response.json();
+                  console.log('Server session test:', data);
+                  alert(`Server session: ${data.sessionExists ? 'EXISTS' : 'NOT FOUND'}\nCheck console for details`);
+                } catch (error) {
+                  console.error('Session test error:', error);
+                  alert('Error testing session - check console');
+                }
+              }}
+              className="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+            >
+              Test Server Session
+            </button>
+          </div>
+          <div className="text-xs text-blue-600">
+            💡 Use Test Server Session to check if the server can read your session cookies.
+          </div>
         </div>
       )}
       {status === "loading" && (

@@ -39,56 +39,14 @@ export default function UsersDatasets() {
   // const router = useRouter();
   const { data: session, status  } = useSession();
 
-  // Debug session in production
+  // Debug session in production (simplified)
   React.useEffect(() => {
-    console.log("UsersDatasets - Session status:", status);
-    console.log("UsersDatasets - Session data:", session);
-    console.log("UsersDatasets - All cookies:", document.cookie);
-    
-    // Check specifically for NextAuth cookies
-    const cookies = document.cookie.split(';').map(c => c.trim());
-    const authCookies = cookies.filter(c => c.includes('next-auth') || c.includes('__Secure-next-auth'));
-    console.log("UsersDatasets - Auth cookies found:", authCookies);
-    
-    // Check if we can see session token specifically
-    const sessionToken = cookies.find(c => c.includes('session-token'));
-    console.log("UsersDatasets - Session token cookie:", sessionToken ? "FOUND" : "NOT FOUND");
+    if (process.env.NODE_ENV === "development") {
+      console.log("UsersDatasets - Session status:", status);
+      console.log("UsersDatasets - Session data:", session);
+    }
   }, [status, session]);
 
-  // Force session refresh function
-  //  const   handleRefreshSession = async () => {
-  //   console.log("Manually refreshing session...");
-  //   // Try multiple approaches for session recovery
-  //   try {
-  //     // Clear any cached session
-  //     await fetch("/api/auth/session", { 
-  //       method: "GET", 
-  //       cache: "no-store",
-  //       headers: { "Cache-Control": "no-cache" }
-  //     });
-      
-  //     // Force session update
-  //     await update();
-      
-  //     // If still not working, hard refresh
-  //     setTimeout(() => {
-  //       if (status === "unauthenticated") {
-  //         window.location.href = window.location.pathname + window.location.search;
-  //       }
-  //     }, 1000);
-  //   } catch (error) {
-  //     console.error("Manual session refresh error:", error);
-  //     // Fallback to hard refresh
-  //     window.location.href = window.location.pathname + window.location.search;
-  //   }
-  // };
-
-  // // Redirect unauthenticated users (effect is fine; it's not a hook count issue)
-  // React.useEffect(() => {
-  //   if (status === "unauthenticated") {
-  //     router.push("/auth/login");
-  //   }
-  // }, [status, router]);
 
   // Queries: always *declare* them. Use `enabled` to avoid network calls, but don't conditionally skip hook calls.
   const {
@@ -308,34 +266,16 @@ export default function UsersDatasets() {
         <div className="mb-4 text-sm text-red-500">Error loading data: {errorMsg}</div>
       )}
       {status === "unauthenticated" && (
-        <div className="mb-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
-          <div className="text-sm text-red-800 mb-3 font-medium">
-            🔄 Session Synchronization Issue Detected
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="text-sm text-blue-800 mb-2">
+            Please log in to access your datasets.
           </div>
-          <div className="text-sm text-red-700 mb-3">
-            Your login session exists on the server but isn&apos;t syncing with the browser. 
-            This is a known issue with Vercel deployments.
-          </div>
-          <div className="flex gap-2 mb-2">
-            <button 
-              onClick={() => {
-                console.log("Manual page refresh triggered to fix session sync");
-                window.location.reload();
-              }}
-              className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 font-medium shadow"
-            >
-              🔄 Reload Page (Recommended)
-            </button>
-            <a 
-              href="/auth/login" 
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 shadow"
-            >
-              🔐 Login Again
-            </a>
-          </div>
-          <div className="text-xs text-red-600">
-            💡 Reloading the page will fix the session synchronization and restore your access.
-          </div>
+          <a 
+            href="/auth/login" 
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+          >
+            Login
+          </a>
         </div>
       )}
       {status === "loading" && (

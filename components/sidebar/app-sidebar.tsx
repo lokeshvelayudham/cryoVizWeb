@@ -233,9 +233,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: session?.user?.image || "",
   };
 
-  // Debug logging for production issues
+  // Debug logging for development only
   React.useEffect(() => {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "development") {
       console.log("AppSidebar - Session status:", status);
       console.log("AppSidebar - Session user:", session?.user);
       console.log("AppSidebar - User access level:", userAccessLevel);

@@ -16,16 +16,6 @@ const queryClient = new QueryClient({
 });
 
 export function Providers({ children, session }: { children: React.ReactNode, session: Session | null }) {
-  // Debug session passing from server to client
-  React.useEffect(() => {
-    console.log("🔄 Providers - Server session passed to client:", session);
-    console.log("🔄 Providers - Session exists:", !!session);
-    if (session) {
-      console.log("🔄 Providers - Session user:", session.user);
-      console.log("🔄 Providers - Session expires:", session.expires);
-    }
-  }, [session]);
-
   return (
     <SessionProvider 
       session={session} 

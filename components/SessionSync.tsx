@@ -4,57 +4,70 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 export function SessionSync() {
-  const { status } = useSession();
-  const [syncAttempted, setSyncAttempted] = useState(false);
-    const [isLoading, ] = useState(true);
+  const { status, update } = useSession();
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [attempts, setAttempts] = useState(0);
 
   useEffect(() => {
-    const syncSession = async () => {
-      // Only attempt sync once per page load and only if unauthenticated
-      if (status === "unauthenticated" && !syncAttempted) {
-        setSyncAttempted(true);
+    const attemptSessionRecovery = async () => {
+      // Only attempt recovery if unauthenticated and haven't tried too many times
+      if (status === "unauthenticated" && !isRecovering && attempts < 3) {
+        setIsRecovering(true);
+        setAttempts(prev => prev + 1);
+        
+        if (process.env.NODE_ENV === "development") {
+          console.log(`🔄 SessionSync: Attempt ${attempts + 1} - Gentle session recovery...`);
+        }
         
         try {
-          console.log("🔄 SessionSync: Client unauthenticated, checking server...");
+          // Strategy 1: Try session update first (gentle approach)
+          await update();
           
-          // Check if server has a session
-          const response = await fetch("/api/test-session", {
-            credentials: "include",
-            cache: "no-store"
-          });
+          // Give it a moment to see if the update worked
+          setTimeout(async () => {
+            if (status === "unauthenticated") {
+              // Strategy 2: Force a fresh session fetch
+              await fetch("/api/auth/session", {
+                method: "GET",
+                credentials: "include",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+              });
+              
+              // Try update again
+              await update();
+              
+              // If still not working after 3 attempts, do a gentle refresh
+              if (attempts >= 2 && status === "unauthenticated") {
+                if (process.env.NODE_ENV === "development") {
+                  console.log("🔄 SessionSync: Gentle page refresh needed");
+                }
+                window.location.href = window.location.href;
+              }
+            }
+            setIsRecovering(false);
+          }, 1500);
           
-          const data = await response.json();
-          
-          if (data.sessionExists && data.serverSession) {
-            console.log("🔄 SessionSync: Server has session, client doesn't - reloading page...");
-            // Just reload the page - this is the most reliable way to sync
-            window.location.reload();
-          } else {
-            console.log("🔄 SessionSync: Server also has no session - user needs to login");
-          }
         } catch (error) {
-          console.error("🔄 SessionSync: Error:", error);
+          console.error("SessionSync error:", error);
+          setIsRecovering(false);
         }
       }
     };
 
     // Only run if status is not loading
     if (status !== "loading") {
-      syncSession();
+      attemptSessionRecovery();
     }
-  }, [status, syncAttempted]);
-
-  // Show loading indicator if syncing
-  if (isLoading) {
-    return (
-      <div className="fixed top-4 right-4 bg-blue-500 text-white px-3 py-2 rounded-lg shadow-lg z-50">
-        <div className="flex items-center gap-2">
-          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-          <span className="text-sm">Syncing session...</span>
-        </div>
-      </div>
-    );
-  }
+  }, [status, update, isRecovering, attempts]);
 
   return null;
+}
+
+// Extend window type for the global flag
+declare global {
+  interface Window {
+    __sessionSyncAttempted?: boolean;
+    __sessionSyncInProgress?: boolean;
+  }
 }

@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SparklesCore } from "@/components/ui/sparkles";
 import { LoginForm } from "@/components/login-form"
-import { useTheme } from "next-themes"
+
 
 export default function LoginPage() {
   const [showLogin, setShowLogin] = useState(false);
-  const { theme, resolvedTheme } = useTheme();
 
 
   useEffect(() => {
@@ -16,9 +14,8 @@ export default function LoginPage() {
     }, 1000);
     return () => clearTimeout(timer);
   }, []);
-   // Determine actual theme (in case of system theme preference)
-   const currentTheme = theme === "system" ? resolvedTheme : theme;
-   const particleColor = currentTheme === "dark" ? "#ffffff" : "#000000";
+   
+   
 
 
    // Choose particle color based on theme
@@ -42,15 +39,7 @@ export default function LoginPage() {
         <div className="absolute inset-x-60 top-0 bg-gradient-to-r from-transparent via-sky-500 to-transparent h-[5px] w-1/4 blur-sm" />
         <div className="absolute inset-x-60 top-0 bg-gradient-to-r from-transparent via-sky-500 to-transparent h-px w-1/4" />
 
-        {/* Core component */}
-        <SparklesCore
-          background="transparent"
-          minSize={0.4}
-          maxSize={1}
-          particleDensity={1200}
-          className="w-full h-full"
-          particleColor={particleColor}
-        />
+       
 
         {/* Radial Gradient to prevent sharp edges */}
         <div className="absolute inset-0 w-full h-full [mask-image:radial-gradient(350px_200px_at_top,transparent_20%,white)]"></div>

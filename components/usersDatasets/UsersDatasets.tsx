@@ -39,22 +39,11 @@ export default function UsersDatasets() {
   // const router = useRouter();
   const { data: session, status  } = useSession();
 
-  // Debug session and cookies
+  // Session status tracking (development only)
   React.useEffect(() => {
-    console.log("UsersDatasets - Session status:", status);
-    console.log("UsersDatasets - Session data:", session);
-    console.log("UsersDatasets - All cookies:", document.cookie);
-    
-    // Check for specific NextAuth cookies
-    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-      const [name, value] = cookie.trim().split('=');
-      if (name.includes('next-auth')) {
-        acc[name] = value ? 'EXISTS' : 'EMPTY';
-      }
-      return acc;
-    }, {} as Record<string, string>);
-    
-    console.log("UsersDatasets - NextAuth cookies:", cookies);
+    if (process.env.NODE_ENV === "development") {
+      console.log("UsersDatasets - Session status:", status);
+    }
   }, [status, session]);
 
 
@@ -275,42 +264,16 @@ export default function UsersDatasets() {
       {!loading && errorMsg && (
         <div className="mb-4 text-sm text-red-500">Error loading data: {errorMsg}</div>
       )}
-      {status === "unauthenticated" && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="text-sm text-blue-800 mb-3">
-            Please log in to access your datasets.
-          </div>
-          <div className="flex gap-2 mb-3">
-            <a 
-              href="/auth/login" 
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-            >
-              Login
-            </a>
-            <button
-              onClick={async () => {
-                try {
-                  const response = await fetch('/api/test-session');
-                  const data = await response.json();
-                  console.log('Server session test:', data);
-                  alert(`Server session: ${data.sessionExists ? 'EXISTS' : 'NOT FOUND'}\nCheck console for details`);
-                } catch (error) {
-                  console.error('Session test error:', error);
-                  alert('Error testing session - check console');
-                }
-              }}
-              className="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
-            >
-              Test Server Session
-            </button>
-          </div>
-          <div className="text-xs text-blue-600">
-            💡 Use Test Server Session to check if the server can read your session cookies.
+      {/* Show gentle loading state during session sync */}
+      {(status === "loading" || status === "unauthenticated") && (
+        <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin h-5 w-5 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+            <div className="text-sm text-gray-600">
+              {status === "loading" ? "Loading session..." : "Preparing your datasets..."}
+            </div>
           </div>
         </div>
-      )}
-      {status === "loading" && (
-        <div className="mb-4 text-sm text-muted-foreground">Loading session...</div>
       )}
 
       {/* Controls */}

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,19 +38,26 @@ export function LoginForm({
       return;
     }
 
-    // Step 2: Trigger OTP
-    const res = await signIn("email", {
-      email,
-      redirect: false,
-      callbackUrl: `/auth/verify?email=${encodeURIComponent(email)}`,
-    });
+    // Step 2: Request OTP using direct API (no NextAuth involvement)
+    try {
+      const otpRes = await fetch("/api/auth/request-otp", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        headers: { "Content-Type": "application/json" },
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (res?.ok) {
-      router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
-    } else {
-      setMessage("Error sending OTP. Try again.");
+      if (otpRes.ok) {
+        router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
+      } else {
+        const errorData = await otpRes.json();
+        setMessage(errorData.error || "Error sending OTP. Try again.");
+      }
+    } catch (err: unknown) {
+      console.error("LoginForm error:", err);
+      setLoading(false);
+      setMessage("Network error. Please try again.");
     }
   };
 

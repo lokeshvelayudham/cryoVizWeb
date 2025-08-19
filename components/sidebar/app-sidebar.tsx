@@ -233,14 +233,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: session?.user?.image || "",
   };
 
-  // Debug logging for development only
+  // Session status tracking (development only)
   React.useEffect(() => {
     if (process.env.NODE_ENV === "development") {
       console.log("AppSidebar - Session status:", status);
-      console.log("AppSidebar - Session user:", session?.user);
-      console.log("AppSidebar - User access level:", userAccessLevel);
     }
-  }, [status, session, userAccessLevel]);
+  }, [status]);
 
   if (loading) {
     return (

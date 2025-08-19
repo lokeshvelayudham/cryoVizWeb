@@ -57,22 +57,6 @@ export async function POST(req: Request) {
   };
   
   cookieStore.set(cookieName, token, cookieOptions);
-  
-  console.log(`✅ Session cookie set: ${cookieName} for ${email}`);
-  console.log(`🔧 Cookie options:`, cookieOptions);
-  console.log(`🎫 Token length:`, token.length);
-  
-  // Verify the cookie was set by trying to read it back
-  const setCookie = cookieStore.get(cookieName);
-  console.log(`🔍 Cookie verification:`, setCookie ? 'FOUND' : 'NOT FOUND');
 
-  return NextResponse.json({ 
-    success: true,
-    debug: {
-      cookieName,
-      cookieSet: !!setCookie,
-      tokenLength: token.length,
-      environment: process.env.NODE_ENV
-    }
-  });
+  return NextResponse.json({ success: true });
 }

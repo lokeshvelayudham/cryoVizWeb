@@ -28,23 +28,13 @@ export interface User {
 
 export interface Dataset {
   _id?: ObjectId;
+  datasetId?: string; // UUID from Python processing
   name: string;
   description?: string;
   institutionId: string;
   brightfieldBlobUrl?: string;
   fluorescentBlobUrl?: string;
-  alphaBlobUrl?: string;
-  liverTiffBlobUrl?: string;
-  tumorTiffBlobUrl?: string;
-  voxels?: number;
-  thickness?: number;
-  pixelLengthUM?: number;
-  zSkip?: number;
-  specimen?: string;
-  pi?: string;
-  dims3?: { x?: number; y?: number; z?: number };
-  dims2?: { x?: number; y?: number; z?: number };
-  imageDims?: { x?: number; y?: number; z?: number };
+  spacing?: number;
   assignedUsers?: string[];
   createdAt: Date;
   brightfieldNumZ?: number;
@@ -258,34 +248,16 @@ export async function createDataset(dataset: Omit<Dataset, "_id" | "createdAt">)
     const client = await clientPromise;
     const db = client.db();
 
-    // Sanitize numeric fields
+    // Sanitize dataset fields to match simplified interface
     const sanitizedDataset: Omit<Dataset, "_id" | "createdAt"> = {
-      ...dataset,
-      voxels: typeof dataset.voxels === "number" && !isNaN(dataset.voxels) ? dataset.voxels : undefined,
-      thickness: typeof dataset.thickness === "number" && !isNaN(dataset.thickness) ? dataset.thickness : undefined,
-      pixelLengthUM: typeof dataset.pixelLengthUM === "number" && !isNaN(dataset.pixelLengthUM) ? dataset.pixelLengthUM : undefined,
-      zSkip: typeof dataset.zSkip === "number" && !isNaN(dataset.zSkip) ? dataset.zSkip : undefined,
-      dims3: dataset.dims3
-        ? {
-          x: typeof dataset.dims3.x === "number" && !isNaN(dataset.dims3.x) ? dataset.dims3.x : undefined,
-          y: typeof dataset.dims3.y === "number" && !isNaN(dataset.dims3.y) ? dataset.dims3.y : undefined,
-          z: typeof dataset.dims3.z === "number" && !isNaN(dataset.dims3.z) ? dataset.dims3.z : undefined,
-        }
-        : undefined,
-      dims2: dataset.dims2
-        ? {
-          x: typeof dataset.dims2.x === "number" && !isNaN(dataset.dims2.x) ? dataset.dims2.x : undefined,
-          y: typeof dataset.dims2.y === "number" && !isNaN(dataset.dims2.y) ? dataset.dims2.y : undefined,
-          z: typeof dataset.dims2.z === "number" && !isNaN(dataset.dims2.z) ? dataset.dims2.z : undefined,
-        }
-        : undefined,
-      imageDims: dataset.imageDims
-        ? {
-          x: typeof dataset.imageDims.x === "number" && !isNaN(dataset.imageDims.x) ? dataset.imageDims.x : undefined,
-          y: typeof dataset.imageDims.y === "number" && !isNaN(dataset.imageDims.y) ? dataset.imageDims.y : undefined,
-          z: typeof dataset.imageDims.z === "number" && !isNaN(dataset.imageDims.z) ? dataset.imageDims.z : undefined,
-        }
-        : undefined,
+      datasetId: dataset.datasetId,
+      name: dataset.name,
+      description: dataset.description,
+      institutionId: dataset.institutionId,
+      brightfieldBlobUrl: dataset.brightfieldBlobUrl,
+      fluorescentBlobUrl: dataset.fluorescentBlobUrl,
+      spacing: typeof dataset.spacing === "number" && !isNaN(dataset.spacing) ? dataset.spacing : undefined,
+      assignedUsers: dataset.assignedUsers || [],
       brightfieldNumZ: typeof dataset.brightfieldNumZ === "number" && !isNaN(dataset.brightfieldNumZ) ? dataset.brightfieldNumZ : undefined,
       brightfieldNumY: typeof dataset.brightfieldNumY === "number" && !isNaN(dataset.brightfieldNumY) ? dataset.brightfieldNumY : undefined,
       brightfieldNumX: typeof dataset.brightfieldNumX === "number" && !isNaN(dataset.brightfieldNumX) ? dataset.brightfieldNumX : undefined,

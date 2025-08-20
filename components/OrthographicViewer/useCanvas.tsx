@@ -20,13 +20,10 @@ export default function useCanvas(
   setLoading: (loading: boolean) => void,
   setErrorMessage: (message: string | null) => void,
   setCoords: Dispatch<SetStateAction<{ x: number; y: number; z: number }>>,
-  brightfieldBlobUrl: string,
-  brightfieldNumZ: number,
-  brightfieldNumY: number,
-  brightfieldNumX: number,
-  fluorescentNumZ: number,
-  fluorescentNumY: number,
-  fluorescentNumX: number
+  blobUrl: string,
+  numZ: number,
+  numY: number,
+  numX: number
 ) {
   const bgColor = theme === "dark" ? "#171717" : "#fafafa";
 
@@ -70,7 +67,7 @@ export default function useCanvas(
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = "anonymous"; // Allow CORS for external URLs
-        img.src = `${brightfieldBlobUrl}/${folder}/${i.toString().padStart(3, "0")}.png`;
+        img.src = `${blobUrl}/${folder}/${i.toString().padStart(3, "0")}.png`;
         img.onload = () => resolve(img);
         img.onerror = () => reject(new Error(`Failed to load image ${i}`));
       });
@@ -82,15 +79,15 @@ export default function useCanvas(
     } catch (error) {
       throw new Error(`Error loading image set ${folder}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [brightfieldBlobUrl]);
+  }, [blobUrl]);
 
   const preloadImages = useCallback(async () => {
     setLoading(true);
     try {
       const [xy, xz, yz] = await Promise.all([
-        loadImageSet("xy", brightfieldNumZ || fluorescentNumZ),
-        loadImageSet("xz", brightfieldNumY || fluorescentNumY), // Adjust folder names if different
-        loadImageSet("yz", brightfieldNumX || fluorescentNumX),
+        loadImageSet("xy", numZ),
+        loadImageSet("xz", numY),
+        loadImageSet("yz", numX),
       ]);
       slicesXY.current = xy;
       slicesXZ.current = xz;
@@ -104,9 +101,9 @@ export default function useCanvas(
 
       loaded.current = true;
       setCoords({
-        x: Math.floor(brightfieldNumX / 2 || fluorescentNumX / 2),
-        y: Math.floor(brightfieldNumY / 2 || fluorescentNumY / 2),
-        z: Math.floor(brightfieldNumZ / 2 || fluorescentNumZ / 2),
+        x: Math.floor(numX / 2),
+        y: Math.floor(numY / 2),
+        z: Math.floor(numZ / 2),
       });
     } catch (error) {
       console.error("Error loading images:", error);
@@ -114,7 +111,7 @@ export default function useCanvas(
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setErrorMessage, setCoords, brightfieldBlobUrl, brightfieldNumZ, brightfieldNumY, brightfieldNumX, fluorescentNumZ, fluorescentNumY, fluorescentNumX]);
+  }, [setLoading, setErrorMessage, setCoords, blobUrl, numZ, numY, numX]);
 
   const drawCrosshair = useCallback(
     (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {
@@ -212,26 +209,26 @@ export default function useCanvas(
       if (view === "XY") {
         newCoords = {
           ...coords,
-          x: Math.floor((mx / dimensions.xy.width) * (brightfieldNumX || fluorescentNumX)),
-          y: Math.floor((my / dimensions.xy.height) * (brightfieldNumY || fluorescentNumY)),
+          x: Math.floor((mx / dimensions.xy.width) * numX),
+          y: Math.floor((my / dimensions.xy.height) * numY),
         };
       } else if (view === "XZ") {
         newCoords = {
           ...coords,
-          x: Math.floor((mx / dimensions.xz.width) * (brightfieldNumX || fluorescentNumX)),
-          z: Math.floor((my / dimensions.xz.height) * (brightfieldNumZ || fluorescentNumZ)),
+          x: Math.floor((mx / dimensions.xz.width) * numX),
+          z: Math.floor((my / dimensions.xz.height) * numZ),
         };
       } else if (view === "YZ") {
         newCoords = {
           ...coords,
-          y: Math.floor((mx / dimensions.yz.width) * (brightfieldNumY || fluorescentNumY)),
-          z: Math.floor((my / dimensions.yz.height) * (brightfieldNumZ || fluorescentNumZ)),
+          y: Math.floor((mx / dimensions.yz.width) * numY),
+          z: Math.floor((my / dimensions.yz.height) * numZ),
         };
       }
 
       setCoords(newCoords);
     },
-    [coords, zoomXY, zoomXZ, zoomYZ, dimensions, setCoords]
+    [coords, zoomXY, zoomXZ, zoomYZ, dimensions, setCoords, numX, numY, numZ]
   );
 
   const handleWheel = useCallback(
@@ -249,11 +246,11 @@ export default function useCanvas(
       } else {
         setCoords((prev) => ({
           ...prev,
-          z: Math.min(Math.max(prev.z + (e.deltaY > 0 ? 1 : -1), 0), (brightfieldNumZ || fluorescentNumZ) - 1),
+          z: Math.min(Math.max(prev.z + (e.deltaY > 0 ? 1 : -1), 0), numZ - 1),
         }));
       }
     },
-    [setCoords]
+    [setCoords, numZ]
   );
 
   const handleMouseDown = useCallback(

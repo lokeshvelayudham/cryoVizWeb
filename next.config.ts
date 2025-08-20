@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // External packages for server components
+  serverExternalPackages: ['@azure/storage-blob'],
+
   webpack(config) {
     config.resolve = config.resolve || {};
     config.resolve.alias = {

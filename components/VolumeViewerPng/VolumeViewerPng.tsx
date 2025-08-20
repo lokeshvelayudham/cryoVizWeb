@@ -19,17 +19,31 @@ import OpacitySlider from "./OpacitySlider";
 import ShaderSelector from "./ShaderSelector";
 import vtkRenderWindow from "@kitware/vtk.js/Rendering/Core/RenderWindow";
 
+import { ModalitySwitcher, type Modality } from "@/components/ModalitySwitcher";
+
 const VolumeViewerPng: React.FC<{
-  brightfieldBlobUrl: string;
-  brightfieldNumZ: number;
-  fluorescentNumZ: number;
-  // datasetId: string;  // eslint-disable-line @typescript-eslint/no-unused-vars
+  brightfieldBlobUrl?: string;
+  fluorescentBlobUrl?: string;
+  brightfieldNumZ?: number;
+  fluorescentNumZ?: number;
+  datasetId: string;
 }> = ({
   brightfieldBlobUrl,
+  fluorescentBlobUrl,
   brightfieldNumZ,
   fluorescentNumZ,
-  // datasetId,  // eslint-disable-line @typescript-eslint/no-unused-vars
 }) => {
+  // Determine available modalities
+  const hasBrightfield = Boolean(brightfieldBlobUrl && brightfieldNumZ);
+  const hasFluorescent = Boolean(fluorescentBlobUrl && fluorescentNumZ);
+  
+  // Set default modality to the first available one
+  const defaultModality: Modality = hasBrightfield ? "brightfield" : "fluorescent";
+  const [currentModality, setCurrentModality] = useState<Modality>(defaultModality);
+
+  // Get current modality data
+  const currentBlobUrl = currentModality === "brightfield" ? brightfieldBlobUrl : fluorescentBlobUrl;
+  const currentNumZ = currentModality === "brightfield" ? brightfieldNumZ : fluorescentNumZ;
   const containerRef = useRef<HTMLDivElement>(null);
   const [clip, setClip] = useState({ x: 0, y: 0, z: 0 });
   const [quality, setQuality] = useState(1.5);
@@ -64,9 +78,9 @@ const VolumeViewerPng: React.FC<{
   }, [blendMode]);
 
   useEffect(() => {
-    const sliceCount = brightfieldNumZ || fluorescentNumZ;
+    const sliceCount = currentNumZ || 0;
     const slicePath = (i: number) =>
-      `${brightfieldBlobUrl}/xy/${String(i).padStart(3, "0")}.png`;
+      `${currentBlobUrl}/xy/${String(i).padStart(3, "0")}.png`;
 
     const loadStackAndRender = async () => {
       const imagePromises = Array.from({ length: sliceCount }, (_, z) => {
@@ -197,8 +211,10 @@ const VolumeViewerPng: React.FC<{
       setLoading(false);
     };
 
-    loadStackAndRender();
-  }, []);
+    if (currentBlobUrl && currentNumZ && currentNumZ > 0) {
+      loadStackAndRender();
+    }
+  }, [currentBlobUrl, currentNumZ, currentModality, quality, opacityLevel]);
 
   useEffect(() => {
     if (!opacityRef.current || !renderWindowRef.current) return;
@@ -464,8 +480,16 @@ const VolumeViewerPng: React.FC<{
         </div>
       )}
 
-      {/* VTK Canvas */}
+      {/* Modality Switcher */}
+      <ModalitySwitcher
+        hasBrightfield={hasBrightfield}
+        hasFluorescent={hasFluorescent}
+        currentModality={currentModality}
+        onModalityChange={setCurrentModality}
+        className="absolute top-4 left-4 z-50"
+      />
 
+      {/* VTK Canvas */}
       <div
         ref={containerRef}
         // style={{ width: "100%", height: "85vh", position: "relative" }}

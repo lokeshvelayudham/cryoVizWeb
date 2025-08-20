@@ -54,6 +54,7 @@ import DatasetFormPage1 from "@/components/admin/Dataset/DatasetFormPage1";
 import { Institution, User, Dataset } from "@/lib/models";
 import ManageUsersDialog from "./ManageUsersDialog";
 import MediaManagementDialog from "./MediaManagementDialog";
+import { UploadStatusTable } from "./UploadStatusTable";
 
 const uploadDatasetSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -62,6 +63,7 @@ const uploadDatasetSchema = z.object({
   brightfield: z.any().optional(),
   fluorescent: z.any().optional(),
   alpha: z.any().optional(),
+  spacing: z.string().optional(),
 });
 
 type UploadDatasetForm = z.infer<typeof uploadDatasetSchema>;
@@ -212,6 +214,7 @@ export default function Datasets() {
       brightfield: null,
       fluorescent: null,
       alpha: null,
+      spacing: "",
     },
   });
 
@@ -427,35 +430,32 @@ export default function Datasets() {
       formData.append("name", data.name);
       formData.append("description", data.description || "");
       formData.append("institutionId", data.institutionId);
+      formData.append("spacing", data.spacing || "");
       if (data.brightfield) formData.append("brightfield", data.brightfield[0]);
       if (data.fluorescent) formData.append("fluorescent", data.fluorescent[0]);
       if (data.alpha) formData.append("alpha", data.alpha[0]);
 
-      const response = await fetch("/api/upload-dataset", {
+      // Start the async upload (returns immediately with uploadId)
+      const response = await fetch("/api/upload-dataset-async", {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Server response error:", errorData);
-        throw new Error(
-          `Server error: ${response.status} ${response.statusText} - ${errorData}`
-        );
-      }
-
       const result = await response.json();
-      if (result.success) {
-        fetchData();
+      
+      if (response.ok) {
+        // Upload started successfully
+        alert(`Upload started! Check the upload status table below to track progress.`);
         setIsUploadOpen(false);
         resetDataset();
+        // Don't refresh data immediately - let the upload complete first
       } else {
-        console.error("Failed to upload dataset:", result.error);
-        alert(result.error || "Failed to upload dataset");
+        console.error("Failed to start upload:", result.error);
+        alert(result.error || "Failed to start upload");
       }
     } catch (error) {
-      console.error("Error uploading dataset:", error instanceof Error ? error.message : "Unknown error");
-      alert(`Error uploading dataset: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error("Error starting upload:", error instanceof Error ? error.message : "Unknown error");
+      alert(`Error starting upload: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -577,6 +577,11 @@ export default function Datasets() {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Upload Status Table */}
+      <div className="mt-8">
+        <UploadStatusTable />
       </div>
 
       <ManageUsersDialog

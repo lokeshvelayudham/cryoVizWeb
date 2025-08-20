@@ -101,6 +101,14 @@ export default function DatasetFormPage1({ institutions, onSubmit }: DatasetForm
             )}
           />
         </div>
+        <div>
+          <label className="text-sm font-medium">Spacing</label>
+          <Controller
+            control={control}
+            name="spacing"
+            render={({ field }) => <Input {...field} className="mt-1" />}
+          />  
+        </div>
       </div>
       <Button type="submit">Submit</Button>
     </form>

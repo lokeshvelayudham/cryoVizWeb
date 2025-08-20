@@ -13,6 +13,7 @@ import useAnnotations from "./Annotation/useAnnotations";
 import useCanvas from "./useCanvas";
 import useMeasurements from "./useMeasurements";
 import MediaControlPanel from "./MediaControlPanel";
+import { ModalitySwitcher, type Modality } from "@/components/ModalitySwitcher";
 
 type Point = { x: number; y: number };
 type MeasureData = {
@@ -21,19 +22,21 @@ type MeasureData = {
 };
 
 type ViewerProps = {
-  brightfieldBlobUrl: string;
+  brightfieldBlobUrl?: string;
+  fluorescentBlobUrl?: string;
   datasetId: string;
-  brightfieldNumZ: number;
-  brightfieldNumY: number;
-  brightfieldNumX: number;
-  fluorescentNumZ: number;
-  fluorescentNumY: number;
-  fluorescentNumX: number;
+  brightfieldNumZ?: number;
+  brightfieldNumY?: number;
+  brightfieldNumX?: number;
+  fluorescentNumZ?: number;
+  fluorescentNumY?: number;
+  fluorescentNumX?: number;
 };
 
 export default function OrthographicViewer(props: ViewerProps) {
   const {
     brightfieldBlobUrl,
+    fluorescentBlobUrl,
     datasetId,
     brightfieldNumZ,
     brightfieldNumY,
@@ -43,15 +46,29 @@ export default function OrthographicViewer(props: ViewerProps) {
     fluorescentNumX,
   } = props;
 
+  // Determine available modalities
+  const hasBrightfield = Boolean(brightfieldBlobUrl && brightfieldNumZ);
+  const hasFluorescent = Boolean(fluorescentBlobUrl && fluorescentNumZ);
+  
+  // Set default modality to the first available one
+  const defaultModality: Modality = hasBrightfield ? "brightfield" : "fluorescent";
+  const [currentModality, setCurrentModality] = useState<Modality>(defaultModality);
+
+  // Get current modality data
+  const currentBlobUrl = currentModality === "brightfield" ? brightfieldBlobUrl : fluorescentBlobUrl;
+  const currentNumZ = currentModality === "brightfield" ? brightfieldNumZ : fluorescentNumZ;
+  const currentNumY = currentModality === "brightfield" ? brightfieldNumY : fluorescentNumY;
+  const currentNumX = currentModality === "brightfield" ? brightfieldNumX : fluorescentNumX;
+
   // 🔒 All hooks must be called unconditionally, at the top:
   const { theme } = useTheme();
   const { data: session, status } = useSession();
   const userEmail = session?.user?.email || null;
 
   const [coords, setCoords] = useState({
-    x: Math.floor((brightfieldNumX || fluorescentNumX) / 2),
-    y: Math.floor((brightfieldNumY || fluorescentNumY) / 2),
-    z: Math.floor((brightfieldNumZ || fluorescentNumZ) / 2),
+    x: Math.floor((currentNumX || 0) / 2),
+    y: Math.floor((currentNumY || 0) / 2),
+    z: Math.floor((currentNumZ || 0) / 2),
   });
 
   const [loading, setLoading] = useState(true);
@@ -129,13 +146,10 @@ export default function OrthographicViewer(props: ViewerProps) {
     setLoading,
     setErrorMessage,
     setCoords,
-    brightfieldBlobUrl,
-    brightfieldNumZ,
-    brightfieldNumY,
-    brightfieldNumX,
-    fluorescentNumZ,
-    fluorescentNumY,
-    fluorescentNumX
+    currentBlobUrl || "",
+    currentNumZ || 0,
+    currentNumY || 0,
+    currentNumX || 0
   );
 
   // Measurements (prefix var to avoid unused warning)
@@ -176,6 +190,15 @@ export default function OrthographicViewer(props: ViewerProps) {
   useEffect(() => {
     preloadImages();
   }, [preloadImages]);
+
+  // Reset coordinates when modality changes
+  useEffect(() => {
+    setCoords({
+      x: Math.floor((currentNumX || 0) / 2),
+      y: Math.floor((currentNumY || 0) / 2),
+      z: Math.floor((currentNumZ || 0) / 2),
+    });
+  }, [currentModality, currentNumX, currentNumY, currentNumZ]);
 
   const handleAnnotationClick = (
     e: React.MouseEvent<HTMLCanvasElement>,
@@ -239,9 +262,9 @@ export default function OrthographicViewer(props: ViewerProps) {
 
   const handleReset = () => {
     setCoords({
-      x: Math.floor((brightfieldNumX || fluorescentNumX) / 2),
-      y: Math.floor((brightfieldNumY || fluorescentNumY) / 2),
-      z: Math.floor((brightfieldNumZ || fluorescentNumZ) / 2),
+      x: Math.floor((currentNumX || 0) / 2),
+      y: Math.floor((currentNumY || 0) / 2),
+      z: Math.floor((currentNumZ || 0) / 2),
     });
     setPanXY({ x: 0, y: 0 });
     setPanXZ({ x: 0, y: 0 });
@@ -500,11 +523,19 @@ export default function OrthographicViewer(props: ViewerProps) {
         coords={coords}
         onChange={handleSlider}
         limits={{
-          x: (brightfieldNumX || fluorescentNumX) - 1,
-          y: (brightfieldNumY || fluorescentNumY) - 1,
-          z: (brightfieldNumZ || fluorescentNumZ) - 1,
+          x: (currentNumX || 1) - 1,
+          y: (currentNumY || 1) - 1,
+          z: (currentNumZ || 1) - 1,
         }}
         onReset={handleReset}
+      />
+
+      <ModalitySwitcher
+        hasBrightfield={hasBrightfield}
+        hasFluorescent={hasFluorescent}
+        currentModality={currentModality}
+        onModalityChange={setCurrentModality}
+        className="absolute top-4 left-4 z-10"
       />
 
       <ViewControlPanel

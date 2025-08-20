@@ -140,7 +140,8 @@ export default function ClientHome() {
                 <Suspense fallback={<div>Loading Orthographic Viewer...</div>}>
                   <OrthographicViewer
                     brightfieldBlobUrl={dataset.brightfieldBlobUrl}
-                    datasetId={dataset._id.toString()}
+                    fluorescentBlobUrl={dataset.fluorescentBlobUrl}
+                    datasetId={dataset._id?.toString() || ""}
                     brightfieldNumZ={dataset.brightfieldNumZ}
                     brightfieldNumY={dataset.brightfieldNumY}
                     brightfieldNumX={dataset.brightfieldNumX}
@@ -153,13 +154,10 @@ export default function ClientHome() {
                 <Suspense fallback={<div>Loading Volume Viewer...</div>}>
                   <VolumeViewer
                     brightfieldBlobUrl={dataset.brightfieldBlobUrl}
-                    // datasetId={dataset._id.toString()}
+                    fluorescentBlobUrl={dataset.fluorescentBlobUrl}
+                    datasetId={dataset._id?.toString() || ""}
                     brightfieldNumZ={dataset.brightfieldNumZ}
-                    // brightfieldNumY={dataset.brightfieldNumY}
-                    // brightfieldNumX={dataset.brightfieldNumX}
                     fluorescentNumZ={dataset.fluorescentNumZ}
-                    // fluorescentNumY={dataset.fluorescentNumY}
-                    // fluorescentNumX={dataset.fluorescentNumX}
                   />
                 </Suspense>
               )}

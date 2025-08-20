@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BlobServiceClient } from "@azure/storage-blob";
+import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import {
   getInstitutions,
@@ -234,8 +236,58 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: !!r.deletedCount });
     }
     if (action === "delete-dataset") {
-      const r = await deleteDataset(id);
-      return NextResponse.json({ success: !!r.deletedCount });
+      try {
+        // Fetch dataset to discover datasetId / blob prefixes
+        const client = await clientPromise;
+        const db = client.db();
+        const dataset = await db.collection("datasets").findOne({ _id: new ObjectId(id) });
+
+        // Attempt Azure cleanup if configured
+        const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (connectionString) {
+          const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+          const containerName = process.env.AZURE_CONTAINER || "cryovizweb";
+          const containerClient = blobServiceClient.getContainerClient(containerName);
+
+          // Determine prefix (prefer datasetId)
+          let prefix: string | null = null;
+          if (dataset?.datasetId) {
+            prefix = `dataset-${dataset.datasetId}/`;
+          } else if (dataset?.brightfieldBlobUrl) {
+            try {
+              const url = new URL(dataset.brightfieldBlobUrl as string);
+              const parts = url.pathname.split("/").filter(Boolean);
+              // parts[0] is container, rest is path
+              prefix = parts.slice(1, 3).join("/") + "/"; // e.g., dataset-<id>/<modality>/ → trim to dataset-<id>/ if possible
+              // Ensure we only keep dataset-<id>/
+              const dsIdx = parts.findIndex(p => p.startsWith("dataset-"));
+              if (dsIdx >= 1) {
+                prefix = parts.slice(dsIdx, dsIdx + 1).join("/") + "/";
+              }
+            } catch {}
+          }
+
+          if (prefix) {
+            // Delete all blobs under prefix
+            for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+              try {
+                await containerClient.deleteBlob(blob.name);
+              } catch (e) {
+                console.error("Failed to delete blob:", blob.name, e);
+              }
+            }
+          }
+        }
+
+        // Finally, remove dataset document
+        const r = await deleteDataset(id);
+        return NextResponse.json({ success: !!r.deletedCount });
+      } catch (e) {
+        console.error("DELETE dataset with Azure cleanup error:", e);
+        // Attempt DB delete anyway to avoid blocking UI
+        const r = await deleteDataset(id);
+        return NextResponse.json({ success: !!r.deletedCount, warning: "Azure cleanup may have failed" });
+      }
     }
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (e) {

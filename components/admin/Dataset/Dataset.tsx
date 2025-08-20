@@ -29,6 +29,7 @@ import {
   ArrowDown,
   ChevronsUpDown,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import {
   useReactTable,
@@ -479,6 +480,10 @@ export default function Datasets() {
           className="max-w-sm"
         />
         <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
             <DialogTrigger asChild>
               <Button size="sm">

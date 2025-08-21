@@ -119,7 +119,7 @@ export function NavUser({
     }
   }
 
-  // Mark all notifications as read
+  // Mark all notifications as read (delete them)
   const markAllAsRead = async () => {
     try {
       const response = await fetch('/api/notifications', {
@@ -129,8 +129,8 @@ export function NavUser({
       })
       
       if (response.ok) {
-        // Update local state
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+        // Clear all notifications from local state
+        setNotifications([])
       }
     } catch (error) {
       console.error('Error marking all notifications as read:', error)
@@ -487,9 +487,9 @@ export function NavUser({
                 variant="outline"
                 size="sm"
                 onClick={markAllAsRead}
-                disabled={unreadCount === 0}
+                disabled={notifications.length === 0}
               >
-                Mark all as read
+                Clear all notifications
               </Button>
             </div>
             <Button

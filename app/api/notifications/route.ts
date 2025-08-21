@@ -107,8 +107,12 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { notificationId, action } = body;
 
-    if (!notificationId || !action) {
-      return NextResponse.json({ error: "Missing notification ID or action" }, { status: 400 });
+    if (!action) {
+      return NextResponse.json({ error: "Missing action" }, { status: 400 });
+    }
+
+    if (action === 'mark-read' && !notificationId) {
+      return NextResponse.json({ error: "Missing notification ID for mark-read action" }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -120,26 +124,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    let result;
-    
     if (action === 'mark-read') {
       // Mark single notification as read
-      result = await db.collection("notifications").updateOne(
+      const result = await db.collection("notifications").updateOne(
         { _id: new ObjectId(notificationId), userId: user._id.toString() },
         { $set: { read: true } }
       );
+      
+      if (result.matchedCount === 0) {
+        return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+      }
     } else if (action === 'mark-all-read') {
-      // Mark all user's notifications as read
-      result = await db.collection("notifications").updateMany(
-        { userId: user._id.toString(), read: false },
-        { $set: { read: true } }
+      // Delete all user's notifications when marking all as read
+      await db.collection("notifications").deleteMany(
+        { userId: user._id.toString() }
       );
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-    }
-
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "Notification not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });

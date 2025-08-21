@@ -222,7 +222,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const data = {
     navSecondary: [
-      { title: "Support", url: "#", icon: LifeBuoy },
+      { title: "Support", url: "/support", icon: LifeBuoy },
       { title: "Feedback", url: "/feedback", icon: Send },
     ],
     projects: [{ name: "CryoViz 1", url: "#", icon: Frame }],

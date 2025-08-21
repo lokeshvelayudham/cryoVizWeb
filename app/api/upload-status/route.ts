@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
+import { createUploadNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -116,6 +117,26 @@ export async function POST(request: NextRequest) {
       },
       { upsert: true }
     );
+
+    // Create notification when upload completes successfully
+    if (status === "completed" && result_op.modifiedCount > 0) {
+      try {
+        const userId = isInternal ? body.userId : session!.user!.email;
+        
+        // Get user ID from email for notification
+        const user = await db.collection("users").findOne({ email: userId });
+        if (user && user.accessLevel === 'admin') {
+          await createUploadNotification(
+            uploadId,
+            datasetName || "Unknown Dataset",
+            user._id.toString()
+          );
+        }
+      } catch (notificationError) {
+        // Don't fail the upload if notification creation fails
+        console.error("Failed to create upload notification:", notificationError);
+      }
+    }
 
     return NextResponse.json({ success: true, modified: result_op.modifiedCount > 0 });
 

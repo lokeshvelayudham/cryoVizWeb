@@ -37,7 +37,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
 
-  const [userAccessLevel, setUserAccessLevel] = React.useState<string | null>(null);
+  const [userAccessLevel, setUserAccessLevel] = React.useState<string | null>("user");
   const [loadingGate, setLoadingGate] = React.useState(true);
 
   // --- Auth + base user fetch (access level) ---
@@ -231,6 +231,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     name: session?.user?.name || session?.user?.email || "User",
     email: session?.user?.email || "",
     avatar: session?.user?.image || "",
+    accessLevel: userAccessLevel || "user",
   };
 
   // Session status tracking (development only)

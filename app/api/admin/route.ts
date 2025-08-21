@@ -18,6 +18,7 @@ import {
   updateUserDatasets,
 } from "@/lib/models";
 import type { Dataset, Institution, User } from "@/lib/models";
+import { createDatasetAssignmentNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -125,7 +126,38 @@ export async function POST(request: NextRequest) {
         if (typeof b.email !== "string" || !Array.isArray(b.datasets) || !b.datasets.every((d) => typeof d === "string")) {
           return NextResponse.json({ error: "Invalid assign payload" }, { status: 400 });
         }
+        
         const result = await updateUserDatasets(b.email, b.datasets);
+        
+        // Create notifications for newly assigned datasets
+        if (result.modifiedCount > 0) {
+          try {
+            const client = await clientPromise;
+            const db = client.db();
+            
+            // Get user details
+            const user = await db.collection("users").findOne({ email: b.email });
+            if (user) {
+              // Get dataset names for notifications
+              const datasetIds = b.datasets as string[];
+              const datasets = await db.collection("datasets")
+                .find({ _id: { $in: datasetIds.map(id => new ObjectId(id)) } })
+                .toArray();
+              
+              // Create notifications for each dataset
+              for (const dataset of datasets) {
+                await createDatasetAssignmentNotification(
+                  user._id.toString(),
+                  dataset.name || "Unknown Dataset"
+                );
+              }
+            }
+          } catch (notificationError) {
+            // Don't fail the assignment if notification creation fails
+            console.error("Failed to create dataset assignment notifications:", notificationError);
+          }
+        }
+        
         return NextResponse.json({ success: !!result.modifiedCount });
       }
 

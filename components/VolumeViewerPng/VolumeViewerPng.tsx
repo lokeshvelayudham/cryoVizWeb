@@ -486,7 +486,7 @@ const VolumeViewerPng: React.FC<{
         hasFluorescent={hasFluorescent}
         currentModality={currentModality}
         onModalityChange={setCurrentModality}
-        className="absolute top-4 left-4 z-50"
+        className="absolute top-4 right-4 z-50"
       />
 
       {/* VTK Canvas */}

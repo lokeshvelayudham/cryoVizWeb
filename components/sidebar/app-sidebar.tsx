@@ -207,6 +207,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               { title: "Users", url: "/admin/users" },
               { title: "Datasets", url: "/admin/dataset" },
               { title: "Mappings", url: "/admin/mappings" },
+              { title: "Feedback", url: "/admin/feedback" },
             ],
           },
         ]
@@ -222,7 +223,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const data = {
     navSecondary: [
       { title: "Support", url: "#", icon: LifeBuoy },
-      { title: "Feedback", url: "#", icon: Send },
+      { title: "Feedback", url: "/feedback", icon: Send },
     ],
     projects: [{ name: "CryoViz 1", url: "#", icon: Frame }],
   };

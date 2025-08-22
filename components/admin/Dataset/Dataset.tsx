@@ -429,16 +429,56 @@ export default function Datasets() {
 
   const onUploadSubmit = async (data: UploadDatasetForm) => {
     try {
+      // Show loading state
+      alert("Starting upload process... Please wait.");
+      
+      // Step 1: Upload files to Azure temporary storage
+      const uploadPromises = [];
+      const fileUrls: { [key: string]: string } = {};
+      
+      if (data.brightfield) {
+        const brightfieldPromise = uploadFileToAzure(data.brightfield[0], "brightfield");
+        uploadPromises.push(brightfieldPromise);
+      }
+      
+      if (data.fluorescent) {
+        const fluorescentPromise = uploadFileToAzure(data.fluorescent[0], "fluorescent");
+        uploadPromises.push(fluorescentPromise);
+      }
+      
+      if (data.alpha) {
+        const alphaPromise = uploadFileToAzure(data.alpha[0], "alpha");
+        uploadPromises.push(alphaPromise);
+      }
+      
+      // Wait for all files to upload to Azure
+      const uploadResults = await Promise.all(uploadPromises);
+      uploadResults.forEach(result => {
+        fileUrls[result.type] = result.url;
+      });
+      
+      // Step 2: Send metadata to start processing
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("description", data.description || "");
       formData.append("institutionId", data.institutionId);
       formData.append("spacing", data.spacing || "");
-      if (data.brightfield) formData.append("brightfield", data.brightfield[0]);
-      if (data.fluorescent) formData.append("fluorescent", data.fluorescent[0]);
-      if (data.alpha) formData.append("alpha", data.alpha[0]);
+      
+      // Add file URLs instead of file objects
+      if (fileUrls.brightfield) {
+        formData.append("brightfieldTempUrl", fileUrls.brightfield);
+        formData.append("brightfieldFilename", data.brightfield![0].name);
+      }
+      if (fileUrls.fluorescent) {
+        formData.append("fluorescentTempUrl", fileUrls.fluorescent);
+        formData.append("fluorescentFilename", data.fluorescent![0].name);
+      }
+      if (fileUrls.alpha) {
+        formData.append("alphaTempUrl", fileUrls.alpha);
+        formData.append("alphaFilename", data.alpha![0].name);
+      }
 
-      // Start the async upload (returns immediately with uploadId)
+      // Start the async processing (returns immediately with uploadId)
       const response = await fetch("/api/upload-dataset-async", {
         method: "POST",
         body: formData,
@@ -460,6 +500,26 @@ export default function Datasets() {
       console.error("Error starting upload:", error instanceof Error ? error.message : "Unknown error");
       alert(`Error starting upload: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
+  };
+
+  // Helper function to upload files to Azure
+  const uploadFileToAzure = async (file: File, type: string): Promise<{ type: string; url: string }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("uploadId", crypto.randomUUID()); // Generate temporary upload ID
+    
+    const response = await fetch("/api/upload-to-azure", {
+      method: "POST",
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to upload ${type} file to Azure`);
+    }
+    
+    const result = await response.json();
+    return { type, url: result.tempUrl };
   };
 
   const handleUserSelection = (userId: string) => {

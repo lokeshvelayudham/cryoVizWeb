@@ -155,33 +155,43 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     if (!activeMapping) return [];
     return (activeMapping.children || []).map((c) => {
       const d = datasetById.get(c.datasetId) || null;
+      const isActive = c.datasetId === activeDatasetId;
       return {
         id: c.datasetId,
-        title: c.alias || d?.name || c.datasetId,
+        title: isActive ? `→ ${c.alias || d?.name || c.datasetId}` : (c.alias || d?.name || c.datasetId),
         hasAccess:
           (currentUser?.accessLevel === "admin") ||
           (c.datasetId && assignedSet.has(c.datasetId)),
+        isActive,
       };
     });
-  }, [activeMapping, datasetById, currentUser?.accessLevel, assignedSet]);
+  }, [activeMapping, datasetById, currentUser?.accessLevel, assignedSet, activeDatasetId]);
 
   // Computed parent item
   const parentItem = React.useMemo(() => {
     if (!parentIdToShow) return null;
     const d = datasetById.get(parentIdToShow);
+    const isActive = parentIdToShow === activeDatasetId;
     return {
       id: parentIdToShow,
-      title: d?.name || "Parent",
+      title: isActive ? `→ ${d?.name || "Parent"}` : (d?.name || "Parent"),
       hasAccess:
         (currentUser?.accessLevel === "admin") ||
         assignedSet.has(parentIdToShow),
+      isActive,
     };
-  }, [parentIdToShow, datasetById, currentUser?.accessLevel, assignedSet]);
+  }, [parentIdToShow, datasetById, currentUser?.accessLevel, assignedSet, activeDatasetId]);
+
+  // Current selected dataset info
+  const currentDataset = React.useMemo(() => {
+    if (!activeDatasetId) return null;
+    return datasetById.get(activeDatasetId);
+  }, [activeDatasetId, datasetById]);
 
   // --- Build nav model ---
-  const mappingNavItems =
-  parentItem
-    ? [
+  const mappingNavItems = React.useMemo(() => {
+    if (parentItem) {
+      return [
         {
           title: parentItem.title,
           url: parentItem.hasAccess ? `/home?datasetId=${parentItem.id}` : "#",
@@ -191,8 +201,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: c.hasAccess ? CornerDownRight : Lock,
           })),
         },
-      ]
-    : [];
+      ];
+    } else if (currentDataset && !activeMapping) {
+      // Standalone dataset with no mapping
+      return [
+        {
+          title: `→ ${currentDataset.name}`,
+          url: `/home?datasetId=${currentDataset._id}`,
+          items: [],
+        },
+      ];
+    }
+    return [];
+  }, [parentItem, mappingChildren, currentDataset, activeMapping]);
 
   const navMain = [
     ...(userAccessLevel === "admin"
@@ -213,7 +234,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ]
       : []),
     {
-      title: "Datasets",
+      title: currentDataset ? `Datasets - ${currentDataset.name}` : "Datasets",
       url: "/users_datasets",
       icon: Bot,  
       items: mappingNavItems,

@@ -502,24 +502,44 @@ export default function Datasets() {
     }
   };
 
-  // Helper function to upload files to Azure
+  // Helper function to upload files directly to Azure using SAS URLs
   const uploadFileToAzure = async (file: File, type: string): Promise<{ type: string; url: string }> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("uploadId", crypto.randomUUID()); // Generate temporary upload ID
+    const uploadId = crypto.randomUUID();
     
-    const response = await fetch("/api/upload-to-azure", {
+    // Step 1: Get SAS URLs from Vercel API (only metadata, no file)
+    const sasResponse = await fetch("/api/upload-to-azure", {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        fileType: file.type,
+        uploadId: uploadId,
+      }),
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Failed to upload ${type} file to Azure`);
+    if (!sasResponse.ok) {
+      const errorData = await sasResponse.json();
+      throw new Error(errorData.error || `Failed to get SAS URL for ${type} file`);
     }
     
-    const result = await response.json();
-    return { type, url: result.tempUrl };
+    const sasResult = await sasResponse.json();
+    
+    // Step 2: Upload file directly to Azure using SAS URL (bypasses Vercel completely)
+    const uploadResponse = await fetch(sasResult.uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: {
+        "x-ms-blob-type": "BlockBlob",
+        "Content-Type": file.type || "application/octet-stream",
+      },
+    });
+    
+    if (!uploadResponse.ok) {
+      throw new Error(`Failed to upload ${type} file directly to Azure: ${uploadResponse.status} ${uploadResponse.statusText}`);
+    }
+    
+    // Return the read URL for Python backend to download from
+    return { type, url: sasResult.readUrl };
   };
 
   const handleUserSelection = (userId: string) => {

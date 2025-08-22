@@ -12,12 +12,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const uploadId = formData.get("uploadId") as string;
+    const { fileName, uploadId } = await request.json();
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!fileName) {
+      return NextResponse.json({ error: "No file name provided" }, { status: 400 });
     }
 
     if (!uploadId) {
@@ -40,37 +38,34 @@ export async function POST(request: NextRequest) {
     
     // Create unique blob name with upload ID
     const timestamp = Date.now();
-    const blobName = `temp/${uploadId}/${timestamp}_${file.name}`;
+    const blobName = `temp/${uploadId}/${timestamp}_${fileName}`;
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-    // Upload file to Azure
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    await blockBlobClient.upload(buffer, buffer.length, {
-      blobHTTPHeaders: {
-        blobContentType: file.type,
-      },
-    });
-
-    // Generate temporary access URL (valid for 1 hour)
-    const sasToken = await blockBlobClient.generateSasUrl({
-      permissions: BlobSASPermissions.parse("r"), // read permission
+    // Generate SAS URL for direct upload (valid for 1 hour)
+    const sasUploadUrl = await blockBlobClient.generateSasUrl({
+      permissions: BlobSASPermissions.parse("cw"), // create + write permissions
       expiresOn: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
     });
 
-    // Return the temporary URL
+    // Generate SAS URL for reading after upload (valid for 2 hours)
+    const sasReadUrl = await blockBlobClient.generateSasUrl({
+      permissions: BlobSASPermissions.parse("r"), // read permission
+      expiresOn: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours
+    });
+
+    // Return the SAS URLs
     return NextResponse.json({
       success: true,
-      tempUrl: sasToken,
+      uploadUrl: sasUploadUrl,
+      readUrl: sasReadUrl,
       blobName: blobName,
-      message: "File uploaded to Azure successfully"
+      message: "SAS URLs generated successfully"
     });
 
   } catch (error) {
-    console.error("Error uploading to Azure:", error);
+    console.error("Error generating SAS URLs:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to upload to Azure" },
+      { error: error instanceof Error ? error.message : "Failed to generate SAS URLs" },
       { status: 500 }
     );
   }

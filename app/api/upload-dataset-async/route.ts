@@ -62,15 +62,10 @@ export async function POST(request: NextRequest) {
       datasetName: formData.get("name") as string || "Unknown Dataset",
     });
 
-    // Extract file information
-    const brightfield = formData.get("brightfield") as File;
-    const fluorescent = formData.get("fluorescent") as File;
-    const alpha = formData.get("alpha") as File;
-
-    // Upload files to Azure temporary storage
-    const brightfieldTempUrl = brightfield ? await uploadFileToAzure(brightfield, uploadId) : null;
-    const fluorescentTempUrl = fluorescent ? await uploadFileToAzure(fluorescent, uploadId) : null;
-    const alphaTempUrl = alpha ? await uploadFileToAzure(alpha, uploadId) : null;
+    // Extract Azure URLs (files already uploaded directly to Azure)
+    const brightfieldTempUrl = formData.get("brightfieldTempUrl") as string;
+    const fluorescentTempUrl = formData.get("fluorescentTempUrl") as string;
+    const alphaTempUrl = formData.get("alphaTempUrl") as string;
 
     // Create new form data for Python backend
     const pythonFormData = new FormData();
@@ -85,15 +80,15 @@ export async function POST(request: NextRequest) {
     // Add temporary URLs and filenames
     if (brightfieldTempUrl) {
       pythonFormData.append("brightfieldTempUrl", brightfieldTempUrl);
-      pythonFormData.append("brightfieldFilename", brightfield.name);
+      pythonFormData.append("brightfieldFilename", formData.get("brightfieldFilename") as string);
     }
     if (fluorescentTempUrl) {
       pythonFormData.append("fluorescentTempUrl", fluorescentTempUrl);
-      pythonFormData.append("fluorescentFilename", fluorescent.name);
+      pythonFormData.append("fluorescentFilename", formData.get("fluorescentFilename") as string);
     }
     if (alphaTempUrl) {
       pythonFormData.append("alphaTempUrl", alphaTempUrl);
-      pythonFormData.append("alphaFilename", alpha.name);
+      pythonFormData.append("alphaFilename", formData.get("alphaFilename") as string);
     }
 
     // Fire-and-forget: forward to Python processor and return immediately
@@ -118,25 +113,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function uploadFileToAzure(file: File, uploadId: string): Promise<string> {
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("uploadId", uploadId);
 
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/upload-to-azure`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Azure upload failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    return result.tempUrl;
-  } catch (error) {
-    console.error("Error uploading file to Azure:", error);
-    throw error;
-  }
-}

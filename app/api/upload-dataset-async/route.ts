@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Fire-and-forget: forward to Python processor and return immediately
-    const pythonUrl = process.env.PYTHON_PROCESSOR_URL || "http://localhost:8000/process-dataset";
+    const pythonUrl = process.env.PYTHON_PROCESSOR_URL || "https://cryovizwebpy.onrender.com/process-dataset";
 
     // Append tracking fields for Python
     formData.append("uploadId", uploadId);

@@ -117,6 +117,7 @@ export default function OrthographicViewer(props: ViewerProps) {
     canvasXZ,
     canvasYZ,
     dimensions,
+    scaledDimensions, // Use scaled dimensions
     zoomXY,
     zoomXZ,
     zoomYZ,
@@ -139,6 +140,7 @@ export default function OrthographicViewer(props: ViewerProps) {
     preloadImages,
     drawAll,
     activePixelColor: canvasActivePixelColor,
+    resetView,
   } = useCanvas(
     theme,
     coords,
@@ -199,6 +201,8 @@ export default function OrthographicViewer(props: ViewerProps) {
       z: Math.floor((currentNumZ || 0) / 2),
     });
   }, [currentModality, currentNumX, currentNumY, currentNumZ]);
+
+
 
   const handleAnnotationClick = (
     e: React.MouseEvent<HTMLCanvasElement>,
@@ -261,17 +265,7 @@ export default function OrthographicViewer(props: ViewerProps) {
   };
 
   const handleReset = () => {
-    setCoords({
-      x: Math.floor((currentNumX || 0) / 2),
-      y: Math.floor((currentNumY || 0) / 2),
-      z: Math.floor((currentNumZ || 0) / 2),
-    });
-    setPanXY({ x: 0, y: 0 });
-    setPanXZ({ x: 0, y: 0 });
-    setPanYZ({ x: 0, y: 0 });
-    setZoomXY(1);
-    setZoomXZ(1);
-    setZoomYZ(1);
+    resetView(); // Use the reset function from useCanvas
   };
 
   const handleToggleMeasureWrapper = () => {
@@ -299,7 +293,7 @@ export default function OrthographicViewer(props: ViewerProps) {
   };
 
   return hasDataset ? (
-    <div className="h-full w-full p-4 overflow-hidden relative">
+    <div className="h-full w-full p-4 overflow-hidden relative bg-white dark:bg-black">
       {loading && <LoadingOverlay />}
       {errorMessage && (
         <div className="absolute top-12 left-12 bg-red-500/80 text-white px-4 py-2 rounded z-[1000]">
@@ -320,185 +314,229 @@ export default function OrthographicViewer(props: ViewerProps) {
           setCoords={setCoords}
         />
       )}
-      <div className="flex flex-col h-[90%]">
-        {/* XY */}
-        <div className="flex-1 flex justify-center relative">
-          <canvas
-            ref={canvasXY}
-            width={dimensions.xy.width}
-            height={dimensions.xy.height}
-            onClick={(e) => handleCanvasClick(e, "XY")}
-            onWheel={(e) => handleWheel(e, "XY")}
-            onMouseDown={(e) => handleMouseDown(e, "XY")}
-            onMouseMove={(e) => {
-              handleMouseMove(e);
-              handleMouseMoveColor(e, "XY");
-            }}
-            onMouseUp={handleMouseUp}
-            onContextMenu={handleContextMenu}
-            className="relative"
-          />
-          {showAnnotations &&
-            annotations.map(
-              (a) =>
-                a.view === "XY" &&
-                a.slice === coords.z && (
-                  <AnnotationTextBox
-                    key={a._id || a.id}
-                    annotation={{ ...a, _id: a._id ?? a.id }} // force _id to exist
-                    zoomXY={zoomXY}
-                    panXY={panXY}
-                    canvasRef={canvasXY as React.RefObject<HTMLCanvasElement>}
-                    onUpdate={(id, text, newPos, save) => {
-                      const updatedAnnotation = annotations.find(
-                        (ann) => ann._id === id || ann.id === id
-                      );
-                      if (updatedAnnotation) {
-                        const newAnnotation = {
-                          ...updatedAnnotation,
-                          text,
-                          ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
-                        };
-                        setAnnotations((prev) =>
-                          prev.map((ann) =>
-                            ann._id === id || ann.id === id ? newAnnotation : ann
-                          )
+      
+      {/* Responsive container that fits all three views */}
+      <div className="flex flex-col h-[90%] gap-2 overflow-hidden">
+        {/* XY View - Takes more vertical space */}
+        <div className="flex-1 flex justify-center items-center relative min-h-0 overflow-hidden bg-white dark:bg-black rounded-lg shadow-sm">
+          <div className="relative" style={{ 
+            width: scaledDimensions.xy.width, 
+            height: scaledDimensions.xy.height 
+          }}>
+            <canvas
+              ref={canvasXY}
+              width={scaledDimensions.xy.width}
+              height={scaledDimensions.xy.height}
+              onClick={(e) => handleCanvasClick(e, "XY")}
+              onWheel={(e) => handleWheel(e, "XY")}
+              onMouseDown={(e) => handleMouseDown(e, "XY")}
+              onMouseMove={(e) => {
+                handleMouseMove(e);
+                handleMouseMoveColor(e, "XY");
+              }}
+              onMouseUp={handleMouseUp}
+              onContextMenu={handleContextMenu}
+              className="block max-w-full max-h-full"
+              style={{
+                width: scaledDimensions.xy.width,
+                height: scaledDimensions.xy.height
+              }}
+            />
+            {showAnnotations &&
+              annotations.map(
+                (a) =>
+                  a.view === "XY" &&
+                  a.slice === coords.z && (
+                    <AnnotationTextBox
+                      key={a._id || a.id}
+                      annotation={{ ...a, _id: a._id ?? a.id }}
+                      zoomXY={zoomXY}
+                      panXY={panXY}
+                      canvasRef={canvasXY as React.RefObject<HTMLCanvasElement>}
+                      onUpdate={(id, text, newPos, save) => {
+                        const updatedAnnotation = annotations.find(
+                          (ann) => ann._id === id || ann.id === id
                         );
-                        if (save && text && text.trim() !== "") {
-                          saveAnnotationToMongoDB(newAnnotation, !!newPos);
-                        } else if (save) {
+                        if (updatedAnnotation) {
+                          const newAnnotation = {
+                            ...updatedAnnotation,
+                            text,
+                            ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
+                          };
                           setAnnotations((prev) =>
-                            prev.filter((ann) => ann._id !== id && ann.id !== id)
+                            prev.map((ann) =>
+                              ann._id === id || ann.id === id ? newAnnotation : ann
+                            )
                           );
+                          if (save && text && text.trim() !== "") {
+                            saveAnnotationToMongoDB(newAnnotation, !!newPos);
+                          } else if (save) {
+                            setAnnotations((prev) =>
+                              prev.filter((ann) => ann._id !== id && ann.id !== id)
+                            );
+                          }
                         }
-                      }
-                    }}
-                  />
-                )
-            )}
+                      }}
+                    />
+                  )
+              )}
+          </div>
         </div>
 
-        {/* XZ */}
-        <div className="flex-1 flex justify-center relative">
-          <canvas
-            ref={canvasXZ}
-            width={dimensions.xz.width}
-            height={dimensions.xz.height}
-            onClick={(e) => handleCanvasClick(e, "XZ")}
-            onWheel={(e) => handleWheel(e, "XZ")}
-            onMouseDown={(e) => handleMouseDown(e, "XZ")}
-            onMouseMove={(e) => {
-              handleMouseMove(e);
-              handleMouseMoveColor(e, "XZ");
-            }}
-            onMouseUp={handleMouseUp}
-            onContextMenu={handleContextMenu}
-            className="relative"
-          />
-          {showAnnotations &&
-            annotations.map(
-              (a) =>
-                a.view === "XZ" &&
-                a.slice === coords.y && (
-                  <AnnotationTextBox
-                    key={a._id || a.id}
-                    annotation={{ ...a, _id: a._id ?? a.id }} // force _id to exist
-                    zoomXY={zoomXZ}
-                    panXY={panXZ}
-                    canvasRef={canvasXZ as React.RefObject<HTMLCanvasElement>}
-                    onUpdate={(id, text, newPos, save) => {
-                      const updatedAnnotation = annotations.find(
-                        (ann) => ann._id === id || ann.id === id
-                      );
-                      if (updatedAnnotation) {
-                        const newAnnotation = {
-                          ...updatedAnnotation,
-                          text,
-                          ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
-                        };
-                        setAnnotations((prev) =>
-                          prev.map((ann) =>
-                            ann._id === id || ann.id === id ? newAnnotation : ann
-                          )
-                        );
-                        if (save && text && text.trim() !== "") {
-                          saveAnnotationToMongoDB(newAnnotation, !!newPos);
-                        } else if (save) {
-                          setAnnotations((prev) =>
-                            prev.filter((ann) => ann._id !== id && ann.id !== id)
+        {/* Bottom row for XZ and YZ views */}
+        <div className="flex gap-2 h-1/3 min-h-0 overflow-hidden">
+          {/* XZ View */}
+          <div className="flex-1 flex justify-center items-center relative overflow-hidden bg-white dark:bg-black rounded-lg shadow-sm">
+            <div className="relative" style={{ 
+              width: scaledDimensions.xz.width, 
+              height: scaledDimensions.xz.height 
+            }}>
+              <canvas
+                ref={canvasXZ}
+                width={scaledDimensions.xz.width}
+                height={scaledDimensions.xz.height}
+                onClick={(e) => handleCanvasClick(e, "XZ")}
+                onWheel={(e) => handleWheel(e, "XZ")}
+                onMouseDown={(e) => handleMouseDown(e, "XZ")}
+                onMouseMove={(e) => {
+                  handleMouseMove(e);
+                  handleMouseMoveColor(e, "XZ");
+                }}
+                onMouseUp={handleMouseUp}
+                onContextMenu={handleContextMenu}
+                className="block max-w-full max-h-full"
+                style={{
+                  width: scaledDimensions.xz.width,
+                  height: scaledDimensions.xz.height
+                }}
+              />
+              {showAnnotations &&
+                annotations.map(
+                  (a) =>
+                    a.view === "XZ" &&
+                    a.slice === coords.y && (
+                      <AnnotationTextBox
+                        key={a._id || a.id}
+                        annotation={{ ...a, _id: a._id ?? a.id }}
+                        zoomXY={zoomXZ}
+                        panXY={panXZ}
+                        canvasRef={canvasXZ as React.RefObject<HTMLCanvasElement>}
+                        onUpdate={(id, text, newPos, save) => {
+                          const updatedAnnotation = annotations.find(
+                            (ann) => ann._id === id || ann.id === id
                           );
-                        }
-                      }
-                    }}
-                  />
-                )
-            )}
-        </div>
+                          if (updatedAnnotation) {
+                            const newAnnotation = {
+                              ...updatedAnnotation,
+                              text,
+                              ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
+                            };
+                            setAnnotations((prev) =>
+                              prev.map((ann) =>
+                                ann._id === id || ann.id === id ? newAnnotation : ann
+                              )
+                            );
+                            if (save && text && text.trim() !== "") {
+                              saveAnnotationToMongoDB(newAnnotation, !!newPos);
+                            } else if (save) {
+                              setAnnotations((prev) =>
+                                prev.filter((ann) => ann._id !== id && ann.id !== id)
+                              );
+                            }
+                          }
+                        }}
+                      />
+                    )
+                )}
+            </div>
+          </div>
 
-        {/* YZ */}
-        <div className="flex-1 flex justify-center relative">
-          <canvas
-            ref={canvasYZ}
-            width={dimensions.yz.width}
-            height={dimensions.yz.height}
-            onClick={(e) => handleCanvasClick(e, "YZ")}
-            onWheel={(e) => handleWheel(e, "YZ")}
-            onMouseDown={(e) => handleMouseDown(e, "YZ")}
-            onMouseMove={(e) => {
-              handleMouseMove(e);
-              handleMouseMoveColor(e, "YZ");
-            }}
-            onMouseUp={handleMouseUp}
-            onContextMenu={handleContextMenu}
-            className="relative"
-          />
-          {showAnnotations &&
-            annotations.map(
-              (a) =>
-                a.view === "YZ" &&
-                a.slice === coords.x && (
-                  <AnnotationTextBox
-                    key={a._id || a.id}
-                    annotation={{ ...a, _id: a._id ?? a.id }} // force _id to exist 
-                    zoomXY={zoomYZ}
-                    panXY={panYZ}
-                    canvasRef={canvasYZ as React.RefObject<HTMLCanvasElement>}
-                    onUpdate={(id, text, newPos, save) => {
-                      const updatedAnnotation = annotations.find(
-                        (ann) => ann._id === id || ann.id === id
-                      );
-                      if (updatedAnnotation) {
-                        const newAnnotation = {
-                          ...updatedAnnotation,
-                          text,
-                          ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
-                        };
-                        setAnnotations((prev) =>
-                          prev.map((ann) =>
-                            ann._id === id || ann.id === id ? newAnnotation : ann
-                          )
-                        );
-                        if (save && text && text.trim() !== "") {
-                          saveAnnotationToMongoDB(newAnnotation, !!newPos);
-                        } else if (save) {
-                          setAnnotations((prev) =>
-                            prev.filter((ann) => ann._id !== id && ann.id !== id)
+          {/* YZ View */}
+          <div className="flex-1 flex justify-center items-center relative overflow-hidden bg-white dark:bg-black rounded-lg shadow-sm">
+            <div className="relative" style={{ 
+              width: scaledDimensions.yz.width, 
+              height: scaledDimensions.yz.height 
+            }}>
+              <canvas
+                ref={canvasYZ}
+                width={scaledDimensions.yz.width}
+                height={scaledDimensions.yz.height}
+                onClick={(e) => handleCanvasClick(e, "YZ")}
+                onWheel={(e) => handleWheel(e, "YZ")}
+                onMouseDown={(e) => handleMouseDown(e, "YZ")}
+                onMouseMove={(e) => {
+                  handleMouseMove(e);
+                  handleMouseMoveColor(e, "YZ");
+                }}
+                onMouseUp={handleMouseUp}
+                onContextMenu={handleContextMenu}
+                className="block max-w-full max-h-full"
+                style={{
+                  width: scaledDimensions.yz.width,
+                  height: scaledDimensions.yz.height
+                }}
+              />
+              {showAnnotations &&
+                annotations.map(
+                  (a) =>
+                    a.view === "YZ" &&
+                    a.slice === coords.x && (
+                      <AnnotationTextBox
+                        key={a._id || a.id}
+                        annotation={{ ...a, _id: a._id ?? a.id }}
+                        zoomXY={zoomYZ}
+                        panXY={panYZ}
+                        canvasRef={canvasYZ as React.RefObject<HTMLCanvasElement>}
+                        onUpdate={(id, text, newPos, save) => {
+                          const updatedAnnotation = annotations.find(
+                            (ann) => ann._id === id || ann.id === id
                           );
-                        }
-                      }
-                    }}
-                  />
-                )
-            )}
+                          if (updatedAnnotation) {
+                            const newAnnotation = {
+                              ...updatedAnnotation,
+                              text,
+                              ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
+                            };
+                            setAnnotations((prev) =>
+                              prev.map((ann) =>
+                                ann._id === id || ann.id === id ? newAnnotation : ann
+                              )
+                            );
+                            if (save && text && text.trim() !== "") {
+                              saveAnnotationToMongoDB(newAnnotation, !!newPos);
+                            } else if (save) {
+                              setAnnotations((prev) =>
+                                prev.filter((ann) => ann._id !== id && ann.id !== id)
+                              );
+                            }
+                          }
+                        }}
+                      />
+                    )
+                )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <p className="absolute top-4 right-4 text-gray-500 text-sm">
-        Zoom: {zoomXY.toFixed(2)}x {zoomXZ.toFixed(2)}x {zoomYZ.toFixed(2)}x
-      </p>
+      {/* Enhanced zoom and scaling information */}
+      <div className="absolute top-4 right-4 text-black dark:text-white text-sm bg-white/95 dark:bg-black/95 px-3 py-2 rounded-md">
+        <div className="font-semibold mb-1">Canvas Scaling</div>
+        <div>XY: {scaledDimensions.xy.scale.toFixed(3)}x ({scaledDimensions.xy.width}×{scaledDimensions.xy.height})</div>
+        <div>XZ: {scaledDimensions.xz.scale.toFixed(3)}x ({scaledDimensions.xz.width}×{scaledDimensions.xz.height})</div>
+        <div>YZ: {scaledDimensions.yz.scale.toFixed(3)}x ({scaledDimensions.yz.width}×{scaledDimensions.yz.height})</div>
+        <div className="mt-2 font-semibold">Zoom Levels</div>
+        <div>XY: {zoomXY.toFixed(2)}x | XZ: {zoomXZ.toFixed(2)}x | YZ: {zoomYZ.toFixed(2)}x</div>
+        <button 
+          onClick={handleReset}
+          className="mt-2 px-2 py-1 bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 dark:text-black text-white text-xs rounded transition-colors"
+        >
+          Reset View
+        </button>
+      </div>
 
       {activePixelColor && (
-        <div className="absolute bottom-4 right-4 px-2 py-1 rounded-md text-sm opacity-85 bg-white dark:bg-gray-800">
+        <div className="absolute bottom-4 right-4 px-2 py-1 rounded-md text-sm opacity-85 bg-white dark:bg-black">
           {activePixelColor.view}: {activePixelColor.color}
         </div>
       )}

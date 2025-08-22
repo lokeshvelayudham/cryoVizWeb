@@ -142,7 +142,7 @@ const VolumeViewerPng: React.FC<{
 
       const imageData = vtkImageData.newInstance();
       imageData.setDimensions([width, height, depth]);
-      imageData.setSpacing([1, 1, 2]);
+      imageData.setSpacing([1, 1, 3]);
 
       const scalars = vtkDataArray.newInstance({
         name: "ImageScalars",

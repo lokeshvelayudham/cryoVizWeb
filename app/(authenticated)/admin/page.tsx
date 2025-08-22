@@ -1,6 +1,5 @@
 "use client";
 
-
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
   Breadcrumb,
@@ -16,10 +15,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-import { ChartAreaInteractive } from "@/components/admin/Dashboard/chart-area-interactive";
-import { DataTable } from "@/components/admin/Dashboard/data-table";
+// import { DataTable } from "@/components/admin/Dashboard/data-table";
 import { SectionCards } from "@/components/admin/Dashboard/section-cards";
-import data from "./data.json"
 import { User } from "@/lib/models";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
@@ -110,16 +107,13 @@ export default function AdminPage() {
           </div>
         </header>
 
-        
-
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <SectionCards />
               <div className="px-4 lg:px-6">
-                <ChartAreaInteractive />
               </div>
-              <DataTable data={data} />
+              {/* <DataTable data={[]} /> */}
             </div>
           </div>
         </div>

@@ -3,6 +3,18 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Prevent horizontal scrolling globally */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Ensure sidebar layout doesn't cause horizontal scroll */
+.sidebar-layout {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

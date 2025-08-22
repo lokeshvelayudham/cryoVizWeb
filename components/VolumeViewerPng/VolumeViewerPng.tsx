@@ -17,6 +17,7 @@ import RenderQualitySlider from "./RenderQualitySlider";
 import ViewControls from "./ViewControls";
 import OpacitySlider from "./OpacitySlider";
 import ShaderSelector from "./ShaderSelector";
+import SpacingControl from "./SpacingControl";
 import vtkRenderWindow from "@kitware/vtk.js/Rendering/Core/RenderWindow";
 
 import { ModalitySwitcher, type Modality } from "@/components/ModalitySwitcher";
@@ -27,11 +28,14 @@ const VolumeViewerPng: React.FC<{
   brightfieldNumZ?: number;
   fluorescentNumZ?: number;
   datasetId: string;
+  spacing?: number;
 }> = ({
   brightfieldBlobUrl,
   fluorescentBlobUrl,
   brightfieldNumZ,
   fluorescentNumZ,
+  spacing: initialSpacing = 3,
+  datasetId,
 }) => {
   // Determine available modalities
   const hasBrightfield = Boolean(brightfieldBlobUrl && brightfieldNumZ);
@@ -52,6 +56,7 @@ const VolumeViewerPng: React.FC<{
   const [viewOrientation, setViewOrientation] = useState<string>("");
   const [blendMode, setBlendMode] = useState<string>("composite");
   const [loading, setLoading] = useState(true);
+  const [spacing, setSpacing] = useState(initialSpacing);
 
   const clipPlanes = useRef({
     planeX: vtkPlane.newInstance({ normal: [1, 0, 0], origin: [0, 0, 0] }),
@@ -142,7 +147,7 @@ const VolumeViewerPng: React.FC<{
 
       const imageData = vtkImageData.newInstance();
       imageData.setDimensions([width, height, depth]);
-      imageData.setSpacing([1, 1, 3]);
+      imageData.setSpacing([1, 1, spacing]);
 
       const scalars = vtkDataArray.newInstance({
         name: "ImageScalars",
@@ -214,7 +219,7 @@ const VolumeViewerPng: React.FC<{
     if (currentBlobUrl && currentNumZ && currentNumZ > 0) {
       loadStackAndRender();
     }
-  }, [currentBlobUrl, currentNumZ, currentModality, quality, opacityLevel]);
+  }, [currentBlobUrl, currentNumZ, currentModality, quality, opacityLevel, spacing]);
 
   useEffect(() => {
     if (!opacityRef.current || !renderWindowRef.current) return;
@@ -307,6 +312,20 @@ const VolumeViewerPng: React.FC<{
     renderWindowRef.current.getRenderWindow().render();
   };
 
+  const handleSpacingChange = (newSpacing: number) => {
+    setSpacing(newSpacing);
+    // Show brief loading state to indicate volume update
+    setLoading(true);
+    setTimeout(() => setLoading(false), 500);
+  };
+
+  const handleSpacingReset = () => {
+    setSpacing(initialSpacing);
+    // Show brief loading state to indicate volume update
+    setLoading(true);
+    setTimeout(() => setLoading(false), 500);
+  };
+
   return (
     <div
       style={{
@@ -318,7 +337,7 @@ const VolumeViewerPng: React.FC<{
     >
       {/* Floating Controls */}
 
-      {/* Render + Shader + Opacity - Top Left */}
+      {/* Render + Shader + Opacity + Spacing - Top Left */}
       <div
         style={{
           position: "absolute",
@@ -328,6 +347,7 @@ const VolumeViewerPng: React.FC<{
           borderRadius: 8,
           padding: 10,
           zIndex: 20,
+          minHeight: "fit-content",
         }}
       >
         <RenderQualitySlider quality={quality} setQuality={setQuality} />
@@ -336,6 +356,17 @@ const VolumeViewerPng: React.FC<{
           setOpacityLevel={setOpacityLevel}
         />
         <ShaderSelector blendMode={blendMode} setBlendMode={setBlendMode} />
+        
+        {/* Separator */}
+        <div className="w-full h-px bg-white/20 my-3"></div>
+        
+        <SpacingControl
+          spacing={spacing}
+          onSpacingChange={handleSpacingChange}
+          onReset={handleSpacingReset}
+          datasetId={datasetId}
+          isLoading={loading}
+        />
       </div>
 
       {/* Clipping - Bottom Left */}

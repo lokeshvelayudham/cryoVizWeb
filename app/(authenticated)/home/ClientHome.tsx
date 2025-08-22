@@ -160,6 +160,7 @@ export default function ClientHome() {
                         datasetId={dataset._id?.toString() || ""}
                         brightfieldNumZ={dataset.brightfieldNumZ}
                         fluorescentNumZ={dataset.fluorescentNumZ}
+                        spacing={dataset.spacing}
                       />
                     </Suspense>
                   )}

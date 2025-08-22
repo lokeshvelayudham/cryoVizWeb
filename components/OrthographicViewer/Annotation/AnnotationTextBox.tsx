@@ -12,6 +12,7 @@ type Annotation = {
   instance: number;
   datetime: number;
   user: string | null;
+  studyName?: string; // Add study name field
 };
 
 type Props = {
@@ -20,9 +21,17 @@ type Props = {
   zoomXY: number;
   panXY: { x: number; y: number };
   canvasRef: React.RefObject<HTMLCanvasElement>;
+  currentStudyName?: string; // Add current study context
 };
 
-export default function AnnotationTextBox({ annotation, onUpdate, zoomXY, panXY, canvasRef }: Props) {
+export default function AnnotationTextBox({ 
+  annotation, 
+  onUpdate, 
+  zoomXY, 
+  panXY, 
+  canvasRef,
+  currentStudyName = "Default Study"
+}: Props) {
   const [editing, setEditing] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,13 +65,16 @@ export default function AnnotationTextBox({ annotation, onUpdate, zoomXY, panXY,
       parentLeft: parentRect?.left,
       parentTop: parentRect?.top,
       offsetX,
+      studyName: annotation.studyName || currentStudyName,
     });
-  }, [screenX, screenY, annotation.x, annotation.y, zoomXY, panXY, canvasRect, parentRect, offsetX, annotation._id]);
+  }, [screenX, screenY, annotation.x, annotation.y, zoomXY, panXY, canvasRect, parentRect, offsetX, annotation._id, annotation.studyName, currentStudyName]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       setEditing(false);
-      onUpdate(annotation._id || annotation.id, annotation.text, undefined, true);
+      // Ensure the annotation has the current study name
+      const updatedAnnotation = { ...annotation, studyName: annotation.studyName || currentStudyName };
+      onUpdate(updatedAnnotation._id || updatedAnnotation.id, updatedAnnotation.text, undefined, true);
     }
   };
 

@@ -17,6 +17,7 @@ interface Annotation {
   user: string;
   datasetId: string; // Changed from dataset to datasetId
   status: string;
+  studyName?: string; // Add study name field
 }
 
 export async function GET(req: NextRequest) {
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
       datetime: Date.now(),
       datasetId: annotation.datasetId, // Changed to datasetId
       status: "active",
+      studyName: annotation.studyName || "Default Study", // Add study name
     });
 
     console.log("POST result:", { insertedId: result.insertedId.toString(), id: annotation.id });

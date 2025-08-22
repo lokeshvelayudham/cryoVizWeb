@@ -95,20 +95,26 @@ export default function OrthographicViewer(props: ViewerProps) {
   // Annotations
   const {
     annotations,
-    isAnnotating,
-    showAnnotations,
-    editingAnnotationId,
-    editingText,
     setAnnotations,
+    isAnnotating,
     setIsAnnotating,
+    showAnnotations,
     setShowAnnotations,
+    editingAnnotationId,
     setEditingAnnotationId,
+    editingText,
     setEditingText,
     fetchAnnotations,
     saveAnnotationToMongoDB,
     deleteAnnotationFromMongoDB,
-    handleEditAnnotation,
     handleSaveEdit,
+    studies,
+    selectedStudy,
+    viewMode,
+    switchToStudy,
+    switchToStudiesList,
+    createStudy,
+    currentStudyAnnotations,
   } = useAnnotations(userEmail, setErrorMessage, datasetId);
 
   // Canvas logic
@@ -242,6 +248,7 @@ export default function OrthographicViewer(props: ViewerProps) {
       user: userEmail,
       datasetId,
       status: "active",
+      studyName: selectedStudy?.name || "Default Study", // Include current study name
     };
 
     setAnnotations((prev) => [...prev, newAnnotation]);
@@ -302,16 +309,21 @@ export default function OrthographicViewer(props: ViewerProps) {
       )}
       {showModal && (
         <AnnotationModal
-          annotations={annotations}
+          studies={studies || []}
+          selectedStudy={selectedStudy}
+          viewMode={viewMode}
           editingAnnotationId={editingAnnotationId}
           editingText={editingText}
           setEditingAnnotationId={setEditingAnnotationId}
           setEditingText={setEditingText}
-          handleEditAnnotation={handleEditAnnotation}
           handleSaveEdit={handleSaveEdit}
           deleteAnnotationFromMongoDB={deleteAnnotationFromMongoDB}
           onClose={() => setShowModal(false)}
           setCoords={setCoords}
+          switchToStudy={switchToStudy}
+          switchToStudiesList={switchToStudiesList}
+          createStudy={createStudy}
+          currentStudyAnnotations={currentStudyAnnotations}
         />
       )}
       
@@ -343,7 +355,7 @@ export default function OrthographicViewer(props: ViewerProps) {
               }}
             />
             {showAnnotations &&
-              annotations.map(
+              (selectedStudy ? currentStudyAnnotations : annotations).map(
                 (a) =>
                   a.view === "XY" &&
                   a.slice === coords.z && (
@@ -353,6 +365,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                       zoomXY={zoomXY}
                       panXY={panXY}
                       canvasRef={canvasXY as React.RefObject<HTMLCanvasElement>}
+                      currentStudyName={selectedStudy?.name || "Default Study"}
                       onUpdate={(id, text, newPos, save) => {
                         const updatedAnnotation = annotations.find(
                           (ann) => ann._id === id || ann.id === id
@@ -361,6 +374,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                           const newAnnotation = {
                             ...updatedAnnotation,
                             text,
+                            studyName: selectedStudy?.name || "Default Study", // Include study name
                             ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
                           };
                           setAnnotations((prev) =>
@@ -411,7 +425,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                 }}
               />
               {showAnnotations &&
-                annotations.map(
+                (selectedStudy ? currentStudyAnnotations : annotations).map(
                   (a) =>
                     a.view === "XZ" &&
                     a.slice === coords.y && (
@@ -421,6 +435,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                         zoomXY={zoomXZ}
                         panXY={panXZ}
                         canvasRef={canvasXZ as React.RefObject<HTMLCanvasElement>}
+                        currentStudyName={selectedStudy?.name || "Default Study"}
                         onUpdate={(id, text, newPos, save) => {
                           const updatedAnnotation = annotations.find(
                             (ann) => ann._id === id || ann.id === id
@@ -429,6 +444,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                             const newAnnotation = {
                               ...updatedAnnotation,
                               text,
+                              studyName: selectedStudy?.name || "Default Study", // Include study name
                               ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
                             };
                             setAnnotations((prev) =>
@@ -477,7 +493,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                 }}
               />
               {showAnnotations &&
-                annotations.map(
+                (selectedStudy ? currentStudyAnnotations : annotations).map(
                   (a) =>
                     a.view === "YZ" &&
                     a.slice === coords.x && (
@@ -487,6 +503,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                         zoomXY={zoomYZ}
                         panXY={panYZ}
                         canvasRef={canvasYZ as React.RefObject<HTMLCanvasElement>}
+                        currentStudyName={selectedStudy?.name || "Default Study"}
                         onUpdate={(id, text, newPos, save) => {
                           const updatedAnnotation = annotations.find(
                             (ann) => ann._id === id || ann.id === id
@@ -495,6 +512,7 @@ export default function OrthographicViewer(props: ViewerProps) {
                             const newAnnotation = {
                               ...updatedAnnotation,
                               text,
+                              studyName: selectedStudy?.name || "Default Study", // Include study name
                               ...(newPos ? { x: newPos.x, y: newPos.y } : {}),
                             };
                             setAnnotations((prev) =>
@@ -544,12 +562,27 @@ export default function OrthographicViewer(props: ViewerProps) {
       <AnnotationPanel
         isAnnotating={isAnnotating}
         showAnnotations={showAnnotations}
+        showModal={showModal}
         onToggleAnnotating={() => {
           setIsAnnotating((prev) => !prev);
-          setShowAnnotations((prev) => !prev);
+          // Automatically show annotations when enabling annotation mode
+          if (!isAnnotating) {
+            setShowAnnotations(true);
+          }
         }}
         onToggleVisibility={() => setShowAnnotations((prev) => !prev)}
-        onOpenModal={() => setShowModal(true)}
+        onOpenModal={() => {
+          setShowModal(true);
+          // Automatically show annotations when opening the modal
+          if (!showAnnotations) {
+            setShowAnnotations(true);
+          }
+        }}
+        onCloseModal={() => setShowModal(false)}
+        studies={studies || []}
+        selectedStudy={selectedStudy}
+        viewMode={viewMode}
+        onSwitchToStudy={switchToStudy}
       />
 
       <MeasureToggleButton

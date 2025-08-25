@@ -62,7 +62,6 @@ jobs:
           skip_api_build: true
           deployment_environment: production
           production_branch: main
-          skip_deploy_on_missing_secrets: false
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

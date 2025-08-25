@@ -79,19 +79,20 @@ export const authOptions: NextAuthOptions = {
       // Handle cases where url or baseUrl might be undefined during build
       if (!url || !baseUrl) return "/";
       
-      // Ensure url is a string before calling string methods
-      const urlString = String(url);
-      const baseUrlString = String(baseUrl);
-      
-      // Allows relative callback URLs
-      if (urlString.startsWith("/")) return `${baseUrlString}${urlString}`;
-      // Allows callback URLs on the same origin
       try {
+        // Ensure url is a string before calling string methods
+        const urlString = String(url);
+        const baseUrlString = String(baseUrl);
+        
+        // Allows relative callback URLs
+        if (urlString.startsWith("/")) return `${baseUrlString}${urlString}`;
+        // Allows callback URLs on the same origin
         if (new URL(urlString).origin === baseUrlString) return urlString;
-      } catch {
-        // If URL parsing fails, return baseUrl
+      } catch (error) {
+        // If anything fails, return a safe default
+        console.warn("Redirect callback error:", error);
       }
-      return baseUrlString;
+      return "/";
     },
   },
   secret: process.env.NEXTAUTH_SECRET,

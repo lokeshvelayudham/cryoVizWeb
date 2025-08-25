@@ -45,6 +45,7 @@ jobs:
           echo "API Location: /app/api"
           echo "Output Location: .next"
           echo "Deployment Environment: production"
+          echo "App Name: cryo-viz-web"
           echo "Token Secret Name: AZURE_STATIC_WEB_APPS_API_TOKEN_RED_STONE_0A0271910"
       
       - name: Build And Deploy
@@ -59,6 +60,7 @@ jobs:
           skip_app_build: false
           skip_api_build: true
           deployment_environment: production
+          app_name: "cryo-viz-web"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

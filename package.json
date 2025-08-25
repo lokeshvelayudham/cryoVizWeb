@@ -50,7 +50,6 @@
     "image-js": "^0.37.0",
     "input-otp": "^1.4.2",
     "jimp": "^1.6.0",
-    "loading-overlay": "link:@kit/ui/loading-overlay",
     "lucide-react": "^0.525.0",
     "mongodb": "^6.17.0",
     "next": "15.3.5",

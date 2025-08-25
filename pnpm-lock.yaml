@@ -131,9 +131,6 @@ importers:
       jimp:
         specifier: ^1.6.0
         version: 1.6.0
-      loading-overlay:
-        specifier: link:@kit/ui/loading-overlay
-        version: link:@kit/ui/loading-overlay
       lucide-react:
         specifier: ^0.525.0
         version: 0.525.0(react@19.1.0)

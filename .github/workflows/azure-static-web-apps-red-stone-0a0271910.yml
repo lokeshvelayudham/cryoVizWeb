@@ -62,7 +62,6 @@ jobs:
           skip_api_build: true
           deployment_environment: production
           production_branch: main
-          routes_location: "staticwebapp.config.json"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

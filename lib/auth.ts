@@ -76,8 +76,8 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // During build time, always return a safe default
-      if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+      // During build time or CI environment, always return a safe default
+      if (process.env.NODE_ENV === "production" || process.env.CI || !process.env.NEXTAUTH_URL) {
         return "/";
       }
       
@@ -91,6 +91,11 @@ export const authOptions: NextAuthOptions = {
         
         // Validate that we have valid strings
         if (typeof urlString !== "string" || typeof baseUrlString !== "string") {
+          return "/";
+        }
+        
+        // Additional safety check for empty strings
+        if (urlString.length === 0 || baseUrlString.length === 0) {
           return "/";
         }
         

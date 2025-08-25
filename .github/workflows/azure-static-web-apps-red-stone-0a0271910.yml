@@ -53,6 +53,7 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CRYO_VIZ_WEB }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "/"
           api_location: "/app/api"
@@ -61,6 +62,7 @@ jobs:
           skip_api_build: true
           deployment_environment: production
           production_branch: main
+          routes_location: "staticwebapp.config.json"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

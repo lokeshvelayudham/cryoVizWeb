@@ -2,6 +2,7 @@ import path from 'path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     formats: ['image/webp'],
     remotePatterns: [
@@ -19,7 +20,7 @@ const nextConfig: NextConfig = {
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      '@': path.resolve(__dirname, 'src'),
+      '@': path.resolve(__dirname, './'),
     };
     return config;
   },

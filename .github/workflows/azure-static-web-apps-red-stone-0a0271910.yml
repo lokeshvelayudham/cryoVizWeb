@@ -39,10 +39,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "/"
-          # If you have a Next.js standalone output dir, set it here; else omit:
-          # app_artifact_location: ".next"
-          # If you’re using Functions, point this at your API folder:
-          # api_location: "api"
+          app_artifact_location: ".next"
+          api_location: "app/api"
           production_branch: "main"
-          # Remove invalid/unknown inputs:
-          # skip_deploy_on_missing_secrets: false

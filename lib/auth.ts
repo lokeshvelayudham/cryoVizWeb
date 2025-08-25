@@ -76,11 +76,14 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // Handle cases where url might be undefined during build
+      if (!url || !baseUrl) return "/";
+      
       // Allows relative callback URLs
-      if (url && url.startsWith("/")) return `${baseUrl}${url}`;
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
       // Allows callback URLs on the same origin
       try {
-        if (url && new URL(url).origin === baseUrl) return url;
+        if (new URL(url).origin === baseUrl) return url;
       } catch {
         // If URL parsing fails, return baseUrl
       }

@@ -2,74 +2,47 @@ name: Azure Static Web Apps CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build_and_deploy_job:
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
     permissions:
-      id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
           lfs: false
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+
+      - uses: pnpm/action-setup@v2
         with:
           version: 10.6.2
-      
-      - name: Install dependencies
+
+      - name: Install deps
         run: pnpm install --frozen-lockfile
-      
-      - name: Build Next.js app
+
+      - name: Build
         run: pnpm run build
-      
-      - name: Debug Azure Configuration
-        run: |
-          echo "Checking Azure Static Web App configuration..."
-          echo "App Location: /"
-          echo "API Location: /app/api"
-          echo "Output Location: .next"
-          echo "Deployment Environment: production"
-          echo "App Name: cryo-viz-web"
-          echo "Token Secret Name: AZURE_STATIC_WEB_APPS_API_TOKEN_CRYO_VIZ_WEB"
-      
-      - name: Build And Deploy
-        id: builddeploy
+
+      - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CRYO_VIZ_WEB }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "/"
-          api_location: "/app/api"
-          output_location: ".next"
-          skip_app_build: false
-          skip_api_build: true
-          deployment_environment: production
-          production_branch: main
-
-  close_pull_request_job:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    name: Close Pull Request Job
-    steps:
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          action: "close"
+          # If you have a Next.js standalone output dir, set it here; else omit:
+          # app_artifact_location: ".next"
+          # If you’re using Functions, point this at your API folder:
+          # api_location: "api"
+          production_branch: "main"
+          # Remove invalid/unknown inputs:
+          # skip_deploy_on_missing_secrets: false

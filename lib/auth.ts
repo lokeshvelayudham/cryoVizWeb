@@ -76,13 +76,23 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Handle cases where url or baseUrl might be undefined during build
+      // During build time, always return a safe default
+      if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+        return "/";
+      }
+      
+      // Handle cases where url or baseUrl might be undefined
       if (!url || !baseUrl) return "/";
       
       try {
         // Ensure url is a string before calling string methods
         const urlString = String(url);
         const baseUrlString = String(baseUrl);
+        
+        // Validate that we have valid strings
+        if (typeof urlString !== "string" || typeof baseUrlString !== "string") {
+          return "/";
+        }
         
         // Allows relative callback URLs
         if (urlString.startsWith("/")) return `${baseUrlString}${urlString}`;

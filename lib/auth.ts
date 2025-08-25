@@ -77,10 +77,10 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      if (url && url.startsWith("/")) return `${baseUrl}${url}`;
       // Allows callback URLs on the same origin
       try {
-        if (new URL(url).origin === baseUrl) return url;
+        if (url && new URL(url).origin === baseUrl) return url;
       } catch {
         // If URL parsing fails, return baseUrl
       }

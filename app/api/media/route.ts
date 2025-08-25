@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId } from "mongodb";
 
 // ----- Mongo setup -----
-const connectionString = process.env.MONGODB_URI;
-if (!connectionString) {
-  throw new Error("MONGODB_URI is not set");
+let client: MongoClient | undefined;
+let connectionString: string | undefined;
+
+// Only initialize MongoDB connection during runtime, not build time
+if (typeof window === "undefined" && process.env.MONGODB_URI) {
+  connectionString = process.env.MONGODB_URI;
+  client = new MongoClient(connectionString);
 }
-const client = new MongoClient(connectionString);
 
 // ----- Types -----
 type MediaDoc = {
@@ -46,6 +49,10 @@ const toJsonErr = (e: unknown) =>
 // ----- GET -----
 export async function GET(req: NextRequest) {
   try {
+    if (!client || !connectionString) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    }
+
     const { searchParams } = new URL(req.url);
     const dataset = searchParams.get("dataset");
     if (!dataset) {
@@ -70,13 +77,19 @@ export async function GET(req: NextRequest) {
     console.error("Error listing files:", e);
     return NextResponse.json(toJsonErr(e), { status: 500 });
   } finally {
-    await client.close();
+    if (client) {
+      await client.close();
+    }
   }
 }
 
 // ----- POST -----
 export async function POST(req: NextRequest) {
   try {
+    if (!client || !connectionString) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    }
+
     const body: unknown = await req.json();
     if (
       !body ||
@@ -114,13 +127,19 @@ export async function POST(req: NextRequest) {
     console.error("Error saving metadata:", e);
     return NextResponse.json(toJsonErr(e), { status: 500 });
   } finally {
-    await client.close();
+    if (client) {
+      await client.close();
+    }
   }
 }
 
 // ----- DELETE -----
 export async function DELETE(req: NextRequest) {
   try {
+    if (!client || !connectionString) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    }
+
     const { searchParams } = new URL(req.url);
     const dataset = searchParams.get("dataset");
     const filename = searchParams.get("filename");
@@ -148,6 +167,8 @@ export async function DELETE(req: NextRequest) {
     console.error("Error deleting file:", e);
     return NextResponse.json(toJsonErr(e), { status: 500 });
   } finally {
-    await client.close();
+    if (client) {
+      await client.close();
+    }
   }
 }

@@ -292,7 +292,7 @@ export async function DELETE(request: NextRequest) {
               // parts[0] is container, rest is path
               prefix = parts.slice(1, 3).join("/") + "/"; // e.g., dataset-<id>/<modality>/ → trim to dataset-<id>/ if possible
               // Ensure we only keep dataset-<id>/
-              const dsIdx = parts.findIndex(p => p.startsWith("dataset-"));
+              const dsIdx = parts.findIndex(p => p && p.startsWith("dataset-"));
               if (dsIdx >= 1) {
                 prefix = parts.slice(dsIdx, dsIdx + 1).join("/") + "/";
               }

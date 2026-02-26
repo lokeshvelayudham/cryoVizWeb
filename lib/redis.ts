@@ -6,12 +6,21 @@ import { Redis } from 'ioredis';
 let redis: Redis;
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisOptions = {
+  maxRetriesPerRequest: 0,
+  enableOfflineQueue: false,
+  connectTimeout: 2000,
+  retryStrategy(times: number) {
+    if (times > 2) return null;
+    return Math.min(times * 100, 1000);
+  }
+};
 
 if (process.env.NODE_ENV === 'production') {
-  redis = new Redis(redisUrl);
+  redis = new Redis(redisUrl, redisOptions);
 } else {
   if (!global._redisClientPromise) {
-    global._redisClientPromise = new Redis(redisUrl);
+    global._redisClientPromise = new Redis(redisUrl, redisOptions);
   }
   redis = global._redisClientPromise;
 }
@@ -44,7 +53,7 @@ export async function getOrSetCache<T>(key: string, fetcher: () => Promise<T>, t
 
   try {
     if (data !== undefined && data !== null) {
-        await redis.set(key, JSON.stringify(data), 'EX', ttl);
+      await redis.set(key, JSON.stringify(data), 'EX', ttl);
     }
   } catch (err) {
     console.error(`[Redis] Error setting cache key ${key}:`, err);

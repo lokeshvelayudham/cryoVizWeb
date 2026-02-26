@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const dataset = (datasets as Dataset[]).find(
       (d) => d._id?.toString() === datasetId
     );
-    if (dataset) return NextResponse.json({ dataset });
+    if (dataset) return NextResponse.json({ dataset: { ...dataset, _id: dataset._id?.toString() } });
     return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
   }
 
@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
     getDatasets(),
   ]);
 
-  return NextResponse.json({ institutions, users, datasets });
+  const safeInstitutions = institutions.map(i => ({ ...i, _id: i._id?.toString() }));
+  const safeUsers = users.map(u => ({ ...u, _id: u._id?.toString(), institutionId: u.institutionId?.toString() }));
+  const safeDatasets = datasets.map(d => ({ ...d, _id: d._id?.toString() }));
+
+  return NextResponse.json({ institutions: safeInstitutions, users: safeUsers, datasets: safeDatasets });
 }
 
 // ---------- POST (create + assign) ----------
@@ -126,15 +130,15 @@ export async function POST(request: NextRequest) {
         if (typeof b.email !== "string" || !Array.isArray(b.datasets) || !b.datasets.every((d) => typeof d === "string")) {
           return NextResponse.json({ error: "Invalid assign payload" }, { status: 400 });
         }
-        
+
         const result = await updateUserDatasets(b.email, b.datasets);
-        
+
         // Create notifications for newly assigned datasets
         if (result.modifiedCount > 0) {
           try {
             const client = await clientPromise;
             const db = client.db();
-            
+
             // Get user details
             const user = await db.collection("users").findOne({ email: b.email });
             if (user) {
@@ -143,7 +147,7 @@ export async function POST(request: NextRequest) {
               const datasets = await db.collection("datasets")
                 .find({ _id: { $in: datasetIds.map(id => new ObjectId(id)) } })
                 .toArray();
-              
+
               // Create notifications for each dataset
               for (const dataset of datasets) {
                 await createDatasetAssignmentNotification(
@@ -157,7 +161,7 @@ export async function POST(request: NextRequest) {
             console.error("Failed to create dataset assignment notifications:", notificationError);
           }
         }
-        
+
         return NextResponse.json({ success: !!result.modifiedCount });
       }
 
@@ -296,7 +300,7 @@ export async function DELETE(request: NextRequest) {
               if (dsIdx >= 1) {
                 prefix = parts.slice(dsIdx, dsIdx + 1).join("/") + "/";
               }
-            } catch {}
+            } catch { }
           }
 
           if (prefix) {

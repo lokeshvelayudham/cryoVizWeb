@@ -1,4 +1,4 @@
-  // app/api/dataset-mappings/route.ts
+// app/api/dataset-mappings/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import {
   getDatasetMappings,
@@ -29,10 +29,11 @@ export async function GET(request: NextRequest) {
   const parentId = searchParams.get("parentId");
   if (parentId) {
     const mapping = await getDatasetMappingByParent(parentId);
-    return NextResponse.json({ mapping });
+    return NextResponse.json({ mapping: mapping ? { ...mapping, _id: mapping._id?.toString() } : null });
   }
   const mappings = await getDatasetMappings();
-  return NextResponse.json({ mappings });
+  const safeMappings = mappings.map(m => ({ ...m, _id: m._id?.toString() }));
+  return NextResponse.json({ mappings: safeMappings });
 }
 
 export async function POST(request: NextRequest) {

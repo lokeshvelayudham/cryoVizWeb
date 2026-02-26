@@ -3,7 +3,7 @@ import { Redis } from 'ioredis';
 
 // Allow global `_redisClientPromise` to persist across HMR (Hot Module Replacement) in Next.js development.
 // This prevents overwhelming the Redis server with connection limits.
-let redis: Redis;
+let redis: Redis | undefined;
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const redisOptions = {

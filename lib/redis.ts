@@ -16,13 +16,18 @@ const redisOptions = {
   }
 };
 
-if (process.env.NODE_ENV === 'production') {
-  redis = new Redis(redisUrl, redisOptions);
-} else {
-  if (!global._redisClientPromise) {
-    global._redisClientPromise = new Redis(redisUrl, redisOptions);
+try {
+  if (process.env.NODE_ENV === 'production') {
+    redis = new Redis(redisUrl, redisOptions);
+  } else {
+    if (!global._redisClientPromise) {
+      global._redisClientPromise = new Redis(redisUrl, redisOptions);
+    }
+    redis = global._redisClientPromise;
   }
-  redis = global._redisClientPromise;
+} catch (e) {
+  console.error('[Redis] Initialization failed, proceeding without cache:', e);
+  // Optional: create a dummy redis client or let it fail gracefully in getOrSetCache
 }
 
 declare global {
@@ -37,6 +42,11 @@ declare global {
  * @param ttl Time to live in seconds (default: 3600 = 1 hour)
  */
 export async function getOrSetCache<T>(key: string, fetcher: () => Promise<T>, ttl: number = 3600): Promise<T> {
+  if (!redis) {
+    console.log(`[Redis] Not initialized. Fetching from source: ${key}`);
+    return await fetcher();
+  }
+
   try {
     const cachedData = await redis.get(key);
     if (cachedData) {
@@ -67,6 +77,8 @@ export async function getOrSetCache<T>(key: string, fetcher: () => Promise<T>, t
  * @param key The Redis cache key
  */
 export async function invalidateCache(key: string): Promise<void> {
+  if (!redis) return;
+
   try {
     await redis.del(key);
     console.log(`[Redis] Cache Invalidated: ${key}`);

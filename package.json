@@ -52,6 +52,7 @@
     "framer-motion": "^12.23.6",
     "image-js": "^0.37.0",
     "input-otp": "^1.4.2",
+    "ioredis": "^5.9.3",
     "jimp": "^1.6.0",
     "lucide-react": "^0.525.0",
     "mongodb": "^6.17.0",

@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import clientPromise from "./mongodb";
+import { getOrSetCache, invalidateCache } from "./redis";
 
 export interface Institution {
   _id?: ObjectId;
@@ -66,9 +67,11 @@ export interface DatasetMapping {
  */
 export async function getInstitutions(): Promise<Institution[]> {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    return await db.collection<Institution>("institutions").find().toArray();
+    return await getOrSetCache('institutions_all', async () => {
+      const client = await clientPromise;
+      const db = client.db();
+      return await db.collection<Institution>("institutions").find().toArray();
+    });
   } catch (error) {
     throw new Error(`Failed to fetch institutions: ${error}`);
   }
@@ -81,9 +84,11 @@ export async function getInstitutions(): Promise<Institution[]> {
  */
 export async function getUsers(): Promise<User[]> {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    return await db.collection<User>("users").find().toArray();
+    return await getOrSetCache('users_all', async () => {
+      const client = await clientPromise;
+      const db = client.db();
+      return await db.collection<User>("users").find().toArray();
+    });
   } catch (error) {
     throw new Error(`Failed to fetch users: ${error}`);
   }
@@ -96,9 +101,11 @@ export async function getUsers(): Promise<User[]> {
  */
 export async function getDatasets(): Promise<Dataset[]> {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    return await db.collection<Dataset>("datasets").find().toArray();
+    return await getOrSetCache('datasets_all', async () => {
+      const client = await clientPromise;
+      const db = client.db();
+      return await db.collection<Dataset>("datasets").find().toArray();
+    });
   } catch (error) {
     throw new Error(`Failed to fetch datasets: ${error}`);
   }
@@ -115,7 +122,9 @@ export async function createInstitution(institution: Omit<Institution, "_id" | "
     const client = await clientPromise;
     const db = client.db();
     const data = { ...institution, createdAt: new Date() };
-    return await db.collection<Institution>("institutions").insertOne(data);
+    const result = await db.collection<Institution>("institutions").insertOne(data);
+    await invalidateCache('institutions_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to create institution: ${error}`);
   }
@@ -135,10 +144,12 @@ export async function updateInstitution(institution: Institution) {
     const client = await clientPromise;
     const db = client.db();
     const { _id, ...updateData } = institution;
-    return await db.collection<Institution>("institutions").updateOne(
+    const result = await db.collection<Institution>("institutions").updateOne(
       { _id: new ObjectId(_id) },
       { $set: { ...updateData, updatedAt: new Date() } }
     );
+    await invalidateCache('institutions_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to update institution: ${error}`);
   }
@@ -159,7 +170,9 @@ export async function createUser(user: Omit<User, "_id" | "logins" | "lastLogin"
       throw new Error("Email already exists");
     }
     const data = { ...user, logins: 0, lastLogin: undefined, assignedDatasets: [] };
-    return await db.collection<User>("users").insertOne(data);
+    const result = await db.collection<User>("users").insertOne(data);
+    await invalidateCache('users_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to create user: ${error}`);
   }
@@ -186,10 +199,12 @@ export async function updateUser(user: User) {
       throw new Error("Email already exists for another user");
     }
     const { _id, ...updateData } = user;
-    return await db.collection<User>("users").updateOne(
+    const result = await db.collection<User>("users").updateOne(
       { _id: new ObjectId(_id) },
       { $set: { ...updateData, updatedAt: new Date() } }
     );
+    await invalidateCache('users_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to update user: ${error}`);
   }
@@ -205,13 +220,15 @@ export async function updateUserLastLogin(id: string) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    return await db.collection<User>("users").updateOne(
+    const result = await db.collection<User>("users").updateOne(
       { _id: new ObjectId(id) },
       {
         $inc: { logins: 1 },
         $set: { lastLogin: new Date(), updatedAt: new Date() },
       }
     );
+    await invalidateCache('users_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to update user login info: ${error}`);
   }
@@ -228,10 +245,12 @@ export async function updateUserDatasets(email: string, datasets: string[]) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    return await db.collection<User>("users").updateOne(
+    const result = await db.collection<User>("users").updateOne(
       { email },
       { $set: { assignedDatasets: datasets } }
     );
+    await invalidateCache('users_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to update user datasets: ${error}`);
   }
@@ -279,8 +298,10 @@ export async function createDataset(dataset: Omit<Dataset, "_id" | "createdAt">)
         )
       );
       await Promise.all(updatePromises);
+      await invalidateCache('users_all');
     }
 
+    await invalidateCache('datasets_all');
     return result;
   } catch (error) {
     throw new Error(`Failed to create dataset: ${error}`);
@@ -301,10 +322,12 @@ export async function updateDataset(dataset: Dataset) {
     const client = await clientPromise;
     const db = client.db();
     const { _id, ...updateData } = dataset;
-    return await db.collection<Dataset>("datasets").updateOne(
+    const result = await db.collection<Dataset>("datasets").updateOne(
       { _id: new ObjectId(_id) },
       { $set: { ...updateData, updatedAt: new Date() } }
     );
+    await invalidateCache('datasets_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to update dataset: ${error}`);
   }
@@ -320,9 +343,11 @@ export async function deleteDataset(id: string) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    return await db.collection<Dataset>("datasets").deleteOne({
+    const result = await db.collection<Dataset>("datasets").deleteOne({
       _id: new ObjectId(id),
     });
+    await invalidateCache('datasets_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to delete dataset: ${error}`);
   }
@@ -338,9 +363,11 @@ export async function deleteInstitution(id: string) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    return await db.collection<Institution>("institutions").deleteOne({
+    const result = await db.collection<Institution>("institutions").deleteOne({
       _id: new ObjectId(id),
     });
+    await invalidateCache('institutions_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to delete institution: ${error}`);
   }
@@ -356,9 +383,11 @@ export async function deleteUser(id: string) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    return await db.collection<User>("users").deleteOne({
+    const result = await db.collection<User>("users").deleteOne({
       _id: new ObjectId(id),
     });
+    await invalidateCache('users_all');
+    return result;
   } catch (error) {
     throw new Error(`Failed to delete user: ${error}`);
   }
@@ -368,15 +397,19 @@ export async function deleteUser(id: string) {
 
 
 export async function getDatasetMappings(): Promise<DatasetMapping[]> {
-  const client = await clientPromise;
-  const db = client.db();
-  return db.collection<DatasetMapping>("dataset_mappings").find().toArray();
+  return await getOrSetCache('dataset_mappings_all', async () => {
+    const client = await clientPromise;
+    const db = client.db();
+    return await db.collection<DatasetMapping>("dataset_mappings").find().toArray();
+  });
 }
 
 export async function getDatasetMappingByParent(parentId: string) {
-  const client = await clientPromise;
-  const db = client.db();
-  return db.collection<DatasetMapping>("dataset_mappings").findOne({ parentId });
+  return await getOrSetCache(`dataset_mappings_${parentId}`, async () => {
+    const client = await clientPromise;
+    const db = client.db();
+    return await db.collection<DatasetMapping>("dataset_mappings").findOne({ parentId });
+  });
 }
 
 export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" | "createdAt">) {
@@ -388,21 +421,37 @@ export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" |
   if (existing) throw new Error("Mapping already exists for this parent dataset");
 
   const doc = { ...mapping, createdAt: new Date(), updatedAt: new Date() };
-  return db.collection<DatasetMapping>("dataset_mappings").insertOne(doc);
+  const result = await db.collection<DatasetMapping>("dataset_mappings").insertOne(doc);
+  await invalidateCache('dataset_mappings_all');
+  await invalidateCache(`dataset_mappings_${mapping.parentId}`);
+  return result;
 }
 
 export async function updateDatasetMapping(id: string, patch: Partial<DatasetMapping>) {
   const client = await clientPromise;
   const db = client.db();
   const { ...rest } = patch; // protect
-  return db.collection<DatasetMapping>("dataset_mappings").updateOne(
+  const result = await db.collection<DatasetMapping>("dataset_mappings").updateOne(
     { _id: new ObjectId(id) },
     { $set: { ...rest, updatedAt: new Date() } }
   );
+  await invalidateCache('dataset_mappings_all');
+  // Optional: In a highly optimized setup we should find the parentId to invalidate it, 
+  // but clearing the whole collection trace might be simpler if it frequently changes.
+  // For now, let's look up to invalidate the specific one.
+  const mapping = await db.collection<DatasetMapping>("dataset_mappings").findOne({ _id: new ObjectId(id) });
+  if (mapping) await invalidateCache(`dataset_mappings_${mapping.parentId}`);
+
+  return result;
 }
 
 export async function deleteDatasetMapping(id: string) {
   const client = await clientPromise;
   const db = client.db();
-  return db.collection<DatasetMapping>("dataset_mappings").deleteOne({ _id: new ObjectId(id) });
+  const mapping = await db.collection<DatasetMapping>("dataset_mappings").findOne({ _id: new ObjectId(id) });
+  const result = await db.collection<DatasetMapping>("dataset_mappings").deleteOne({ _id: new ObjectId(id) });
+
+  await invalidateCache('dataset_mappings_all');
+  if (mapping) await invalidateCache(`dataset_mappings_${mapping.parentId}`);
+  return result;
 }

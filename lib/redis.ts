@@ -1,0 +1,69 @@
+// lib/redis.ts
+import { Redis } from 'ioredis';
+
+// Allow global `_redisClientPromise` to persist across HMR (Hot Module Replacement) in Next.js development.
+// This prevents overwhelming the Redis server with connection limits.
+let redis: Redis;
+
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+
+if (process.env.NODE_ENV === 'production') {
+  redis = new Redis(redisUrl);
+} else {
+  if (!global._redisClientPromise) {
+    global._redisClientPromise = new Redis(redisUrl);
+  }
+  redis = global._redisClientPromise;
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var _redisClientPromise: Redis | undefined;
+}
+
+/**
+ * Helper to fetch data from cache or from source if cache misses.
+ * @param key The Redis cache key
+ * @param fetcher The fallback function to fetch data if cache misses
+ * @param ttl Time to live in seconds (default: 3600 = 1 hour)
+ */
+export async function getOrSetCache<T>(key: string, fetcher: () => Promise<T>, ttl: number = 3600): Promise<T> {
+  try {
+    const cachedData = await redis.get(key);
+    if (cachedData) {
+      console.log(`[Redis] Cache Hit: ${key}`);
+      return JSON.parse(cachedData) as T;
+    }
+  } catch (err) {
+    console.error(`[Redis] Error reading cache key ${key}:`, err);
+  }
+
+  // Cache miss or error reading, fetch from source
+  console.log(`[Redis] Cache Miss: ${key}`);
+  const data = await fetcher();
+
+  try {
+    if (data !== undefined && data !== null) {
+        await redis.set(key, JSON.stringify(data), 'EX', ttl);
+    }
+  } catch (err) {
+    console.error(`[Redis] Error setting cache key ${key}:`, err);
+  }
+
+  return data;
+}
+
+/**
+ * Helper to invalidate/delete a specific cache key
+ * @param key The Redis cache key
+ */
+export async function invalidateCache(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+    console.log(`[Redis] Cache Invalidated: ${key}`);
+  } catch (err) {
+    console.error(`[Redis] Error invalidating cache key ${key}:`, err);
+  }
+}
+
+export default redis;

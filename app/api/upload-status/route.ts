@@ -61,7 +61,6 @@ export async function GET(request: NextRequest) {
       // Signal completion if any just completed (can be used by client to refresh datasets)
       return NextResponse.json({ uploads: safeUploads });
     }
-
   } catch (error) {
     console.error("GET /api/upload-status error:", error);
     return NextResponse.json(

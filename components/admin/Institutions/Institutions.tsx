@@ -124,6 +124,11 @@ export default function Institutions() {
           )}
         </Button>
       ),
+      cell: ({ row }) => (
+        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={row.original.name}>
+          {row.original.name}
+        </div>
+      ),
     },
     {
       accessorKey: "abbr",
@@ -142,6 +147,11 @@ export default function Institutions() {
             <ChevronsUpDown className="h-4 w-4" />
           )}
         </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="max-w-[80px] sm:max-w-[100px] truncate" title={row.original.abbr}>
+          {row.original.abbr}
+        </div>
       ),
     },
     {
@@ -162,12 +172,48 @@ export default function Institutions() {
           )}
         </Button>
       ),
-      cell: ({ row }) => row.original.type,
+      cell: ({ row }) => (
+        <div className="max-w-[100px] sm:max-w-[150px] truncate" title={row.original.type}>
+          {row.original.type}
+        </div>
+      ),
     },
-    { accessorKey: "address", header: "Address" },
-    { accessorKey: "phone", header: "Phone Number" },
-    { accessorKey: "email", header: "Email" },
-    { accessorKey: "website", header: "Website" },
+    {
+      accessorKey: "address",
+      header: "Address",
+      cell: ({ row }) => (
+        <div className="max-w-[200px] sm:max-w-[300px] truncate" title={row.original.address}>
+          {row.original.address}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone Number",
+      cell: ({ row }) => (
+        <div className="max-w-[120px] sm:max-w-[150px] truncate" title={row.original.phone}>
+          {row.original.phone}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => (
+        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={row.original.email}>
+          {row.original.email}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "website",
+      header: "Website",
+      cell: ({ row }) => (
+        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={row.original.website}>
+          {row.original.website}
+        </div>
+      ),
+    },
     {
       accessorKey: "status",
       header: ({ column }) => (
@@ -186,7 +232,11 @@ export default function Institutions() {
           )}
         </Button>
       ),
-      cell: ({ row }) => row.original.status,
+      cell: ({ row }) => (
+        <div className="max-w-[80px] sm:max-w-[100px] truncate" title={row.original.status}>
+          {row.original.status}
+        </div>
+      ),
     },
     {
       id: "actions",

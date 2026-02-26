@@ -39,12 +39,14 @@ export async function GET(request: NextRequest) {
       // Get specific upload status
       const upload = await db.collection<UploadStatus>("upload_status")
         .findOne({ uploadId, userId: session.user.email });
-      
+
       if (!upload) {
         return NextResponse.json({ error: "Upload not found" }, { status: 404 });
       }
-      
-      return NextResponse.json(upload);
+
+      // Ensure we don't pass ObjectId directly to NextResponse.json to avoid serialization errors
+      const safeUpload = { ...upload, _id: upload._id?.toString() };
+      return NextResponse.json(safeUpload);
     } else {
       // Get all uploads for user
       const uploads = await db.collection<UploadStatus>("upload_status")
@@ -52,8 +54,12 @@ export async function GET(request: NextRequest) {
         .sort({ startedAt: -1 })
         .limit(20)
         .toArray();
+
+      // Ensure we don't pass ObjectId directly to NextResponse.json to avoid serialization errors
+      const safeUploads = uploads.map(u => ({ ...u, _id: u._id?.toString() }));
+
       // Signal completion if any just completed (can be used by client to refresh datasets)
-      return NextResponse.json({ uploads });
+      return NextResponse.json({ uploads: safeUploads });
     }
 
   } catch (error) {
@@ -100,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     if (status === "failed") {
       updateData.completedAt = new Date();
-      updateData.error = error;
+      updateData.error = typeof error === 'object' && error !== null ? JSON.stringify(error) : (error ? String(error) : "Unknown error");
     }
 
     // Update existing or create new
@@ -122,7 +128,7 @@ export async function POST(request: NextRequest) {
     if (status === "completed" && result_op.modifiedCount > 0) {
       try {
         const userId = isInternal ? body.userId : session!.user!.email;
-        
+
         // Get user ID from email for notification
         const user = await db.collection("users").findOne({ email: userId });
         if (user && user.accessLevel === 'admin') {

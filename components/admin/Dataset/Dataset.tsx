@@ -429,6 +429,7 @@ export default function Datasets() {
 
   const onUploadSubmit = async (data: UploadDatasetForm) => {
     try {
+      console.log("Starting upload process with data:", { name: data.name, institutionId: data.institutionId });
       // Show loading state
       alert("Starting upload process... Please wait.");
       
@@ -478,6 +479,8 @@ export default function Datasets() {
         formData.append("alphaFilename", data.alpha![0].name);
       }
 
+      console.log("Calling /api/upload-dataset-async API endpoint");
+      
       // Start the async processing (returns immediately with uploadId)
       const response = await fetch("/api/upload-dataset-async", {
         method: "POST",

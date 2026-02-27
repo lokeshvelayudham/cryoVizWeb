@@ -23,7 +23,7 @@ const updateUploadStatus = async (uploadId: string, userId: string, update: Part
   try {
     const client = await clientPromise;
     const db = client.db();
-    
+
     await db.collection<UploadStatus>("upload_status").updateOne(
       { uploadId, userId },
       {
@@ -94,14 +94,16 @@ export async function POST(request: NextRequest) {
     // Fire-and-forget: forward to Python processor and return immediately
     const pythonUrl = process.env.PYTHON_PROCESSOR_URL || "https://cryovizwebpy.onrender.com/process-dataset";
 
+    console.log("Calling Python processor at:", pythonUrl);
+
     // Do not await; let the request proceed independently
     fetch(pythonUrl, { method: "POST", body: pythonFormData }).catch((e) => {
       console.error("Failed to contact Python processor:", e);
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       uploadId,
-      message: "Upload started successfully" 
+      message: "Upload started successfully"
     });
 
   } catch (error) {

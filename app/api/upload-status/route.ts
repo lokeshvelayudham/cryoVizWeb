@@ -48,12 +48,14 @@ export async function GET(request: NextRequest) {
       const safeUpload = { ...upload, _id: upload._id?.toString() };
       return NextResponse.json(safeUpload);
     } else {
-      // Get all uploads for user
-      const uploads = await db.collection<UploadStatus>("upload_status")
+      // Get all uploads for user, sort and limit in memory to avoid Cosmos DB index errors
+      const allUploads = await db.collection<UploadStatus>("upload_status")
         .find({ userId: session.user.email })
-        .sort({ startedAt: -1 })
-        .limit(20)
         .toArray();
+
+      const uploads = allUploads
+        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+        .slice(0, 20);
 
       // Ensure we don't pass ObjectId directly to NextResponse.json to avoid serialization errors
       const safeUploads = uploads.map(u => ({ ...u, _id: u._id?.toString() }));

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/theme-provider";
 import type { Session } from "next-auth";
+import { PostHogProvider } from "@/app/posthog-provider";
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -31,7 +32,9 @@ export function Providers({ children, session }: { children: React.ReactNode, se
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <PostHogProvider>
+            {children}
+          </PostHogProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </SessionProvider>

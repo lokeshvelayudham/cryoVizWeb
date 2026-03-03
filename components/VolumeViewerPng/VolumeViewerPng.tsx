@@ -21,6 +21,8 @@ import SpacingControl from "./SpacingControl";
 import vtkRenderWindow from "@kitware/vtk.js/Rendering/Core/RenderWindow";
 
 import { ModalitySwitcher, type Modality } from "@/components/ModalitySwitcher";
+import { getGPUInfo } from "@/lib/analytics";
+import posthog from "posthog-js";
 
 const VolumeViewerPng: React.FC<{
   brightfieldBlobUrl?: string;
@@ -88,6 +90,7 @@ const VolumeViewerPng: React.FC<{
       `${currentBlobUrl}/xy/${String(i).padStart(3, "0")}.png`;
 
     const loadStackAndRender = async () => {
+      const startTime = performance.now();
       const imagePromises = Array.from({ length: sliceCount }, (_, z) => {
         return new Promise<ImageData>((resolve, reject) => {
           const img = new Image();
@@ -214,6 +217,17 @@ const VolumeViewerPng: React.FC<{
       renderWindow.render();
       renderWindowRef.current = fullScreenRenderer;
       setLoading(false);
+
+      const endTime = performance.now();
+      posthog.capture("dataset_loaded", {
+        datasetId: datasetId,
+        modality: currentModality,
+        slices: sliceCount,
+        spacing: spacing,
+        gpu: getGPUInfo(),
+        quality: quality,
+        loadTimeMs: Math.round(endTime - startTime),
+      });
     };
 
     if (currentBlobUrl && currentNumZ && currentNumZ > 0) {

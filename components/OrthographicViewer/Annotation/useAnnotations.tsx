@@ -383,7 +383,9 @@ export default function useAnnotations(
       fetchStudies();
       fetchAnnotations();
     }
-  }, [userEmail, datasetId, fetchStudies, fetchAnnotations]);
+    // Only run on mount or when user/dataset changes, ignore function recreations
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userEmail, datasetId]);
 
   return {
     annotations,

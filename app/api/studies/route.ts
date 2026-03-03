@@ -36,6 +36,10 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .toArray();
 
+    if (!studies || studies.length === 0) {
+      return NextResponse.json([], { status: 200 });
+    }
+
     const formattedStudies = studies.map((study) => ({
       _id: study._id.toString(),
       name: study.name,
@@ -47,7 +51,7 @@ export async function GET(req: NextRequest) {
       annotationCount: 0, // Will be calculated by frontend
     }));
 
-    console.log("GET studies:", formattedStudies.map(s => ({ _id: s._id, name: s.name, user: s.user, datasetId: s.datasetId })));
+    // console.log("GET studies:", formattedStudies.map(s => ({ _id: s._id, name: s.name, user: s.user, datasetId: s.datasetId })));
     return NextResponse.json(formattedStudies, { status: 200 });
   } catch (error) {
     console.error("Error fetching studies:", error);
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
     // Check if study name already exists for this user and dataset
     const client = await clientPromise;
     const db = client.db();
-    
+
     const existingStudy = await db.collection("studies").findOne({
       name: studyData.name.trim(),
       datasetId: studyData.datasetId,
@@ -104,8 +108,8 @@ export async function POST(req: NextRequest) {
     const result = await db.collection("studies").insertOne(newStudy);
 
     console.log("POST study result:", { insertedId: result.insertedId.toString(), name: newStudy.name });
-    return NextResponse.json({ 
-      _id: result.insertedId.toString(), 
+    return NextResponse.json({
+      _id: result.insertedId.toString(),
       name: newStudy.name,
       datasetId: newStudy.datasetId,
       user: newStudy.user,
@@ -132,7 +136,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const { _id, name, description } = await req.json();
-    
+
     if (!_id) {
       return NextResponse.json({ error: "Study ID is required" }, { status: 400 });
     }
@@ -143,15 +147,15 @@ export async function PUT(req: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db();
-    
+
     const result = await db.collection("studies").updateOne(
       { _id: new ObjectId(_id), user: userEmail },
-      { 
-        $set: { 
-          name: name.trim(), 
+      {
+        $set: {
+          name: name.trim(),
           description,
-          updatedAt: new Date() 
-        } 
+          updatedAt: new Date()
+        }
       }
     );
 
@@ -160,8 +164,8 @@ export async function PUT(req: NextRequest) {
     }
 
     console.log("PUT study result:", { _id, name: name.trim() });
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: "Study updated successfully",
       _id,
       name: name.trim(),
@@ -186,14 +190,14 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { _id, datasetId } = await req.json();
-    
+
     if (!_id || !datasetId) {
       return NextResponse.json({ error: "Study ID and Dataset ID are required" }, { status: 400 });
     }
 
     const client = await clientPromise;
     const db = client.db();
-    
+
     // First, check if there are any annotations in this study
     const annotationCount = await db.collection("annotations").countDocuments({
       studyName: { $exists: true, $ne: null },
@@ -202,8 +206,8 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (annotationCount > 0) {
-      return NextResponse.json({ 
-        error: "Cannot delete study with existing annotations. Please reassign or delete annotations first." 
+      return NextResponse.json({
+        error: "Cannot delete study with existing annotations. Please reassign or delete annotations first."
       }, { status: 400 });
     }
 
@@ -218,9 +222,9 @@ export async function DELETE(req: NextRequest) {
     }
 
     console.log("DELETE study result:", { _id, datasetId });
-    return NextResponse.json({ 
-      success: true, 
-      message: "Study deleted successfully" 
+    return NextResponse.json({
+      success: true,
+      message: "Study deleted successfully"
     });
   } catch (error) {
     console.error("Error deleting study:", error);

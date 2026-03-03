@@ -377,21 +377,13 @@ export default function useAnnotations(
     setEditingText("");
   }, [annotations, editingText, saveAnnotationToMongoDB, deleteAnnotationFromMongoDB, datasetId, fetchStudies]);
 
-  // Fetch studies when component mounts or when annotations change
+  // Fetch studies and annotations when component mounts
   useEffect(() => {
     if (userEmail && datasetId) {
       fetchStudies();
+      fetchAnnotations();
     }
-  }, [userEmail, datasetId, fetchStudies]);
-
-  // Fetch annotations when component mounts
-  useEffect(() => {
-    if (userEmail && datasetId) {
-      // This function should be defined somewhere in the hook
-      // For now, let's call fetchStudies to ensure studies are loaded
-      fetchStudies();
-    }
-  }, [userEmail, datasetId, fetchStudies]);
+  }, [userEmail, datasetId, fetchStudies, fetchAnnotations]);
 
   return {
     annotations,

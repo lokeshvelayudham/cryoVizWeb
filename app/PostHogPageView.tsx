@@ -4,6 +4,8 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { useEffect, Suspense } from "react"
 import { usePostHog } from 'posthog-js/react'
 
+import { getGPUInfo } from "@/lib/analytics"
+
 function PostHogPageViewImpl() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -17,8 +19,15 @@ function PostHogPageViewImpl() {
         url = url + "?" + searchParams.toString()
       }
 
+      // Gather device/hardware info
+      const gpuInfo = getGPUInfo()
+      const isMobile = window.innerWidth <= 768
+
       posthog.capture('$pageview', {
-        $current_url: url
+        $current_url: url,
+        user_gpu: gpuInfo,
+        user_device_type: isMobile ? 'Mobile' : 'Desktop',
+        screen_resolution: `${window.screen.width}x${window.screen.height}`
       })
     }
   }, [pathname, searchParams, posthog])

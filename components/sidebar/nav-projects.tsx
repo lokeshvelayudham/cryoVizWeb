@@ -2,6 +2,7 @@
 
 import {
   Folder,
+  Lock,
   MoreHorizontal,
   Share,
   Trash2,
@@ -38,8 +39,14 @@ export function NavProjects({
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
-      <SidebarMenu>
+      <div className="flex items-center justify-between pr-2">
+        <SidebarGroupLabel>Projects</SidebarGroupLabel>
+        <span className="flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border">
+          <Lock className="h-3 w-3" />
+          Soon
+        </span>
+      </div>
+      <SidebarMenu className="opacity-50 pointer-events-none">
         {projects.map((item) => (
           <SidebarMenuItem key={item.name}>
             <SidebarMenuButton asChild>

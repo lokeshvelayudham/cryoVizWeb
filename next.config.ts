@@ -25,19 +25,6 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Set up reverse proxy for PostHog to bypass ad blockers
-  async rewrites() {
-    return [
-      {
-        source: "/ingest/static/:path*",
-        destination: "https://us-assets.i.posthog.com/static/:path*",
-      },
-      {
-        source: "/ingest/:path*",
-        destination: "https://us.i.posthog.com/:path*",
-      },
-    ];
-  },
 };
 
 export default nextConfig;

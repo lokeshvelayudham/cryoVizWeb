@@ -6,6 +6,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/theme-provider";
 import type { Session } from "next-auth";
 import { PostHogProvider } from "@/app/posthog-provider";
+import PostHogPageView from "@/app/PostHogPageView";
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -33,6 +34,7 @@ export function Providers({ children, session }: { children: React.ReactNode, se
           disableTransitionOnChange
         >
           <PostHogProvider>
+            <PostHogPageView />
             {children}
           </PostHogProvider>
         </ThemeProvider>

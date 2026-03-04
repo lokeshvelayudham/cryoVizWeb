@@ -13,7 +13,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     if (key && !posthog.has_opted_out_capturing()) {
       posthog.init(key, {
         api_host: "/ingest",
-        ui_host: "https://us.i.posthog.com",
+        ui_host: host || "https://us.i.posthog.com",
         person_profiles: "identified_only", 
         capture_pageview: false, // Disable automatic pageview capture, as we capture manually
         disable_session_recording: true,

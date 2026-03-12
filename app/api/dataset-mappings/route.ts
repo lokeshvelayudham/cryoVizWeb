@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ mapping: mapping ? { ...mapping, _id: mapping._id?.toString() } : null });
   }
   const mappings = await getDatasetMappings();
-  const safeMappings = mappings.map(m => ({ ...m, _id: m._id?.toString() }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeMappings = mappings.map((m: any) => ({ ...m, _id: m._id?.toString() }));
   return NextResponse.json({ mappings: safeMappings });
 }
 

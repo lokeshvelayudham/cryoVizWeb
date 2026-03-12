@@ -49,9 +49,12 @@ export async function GET(request: NextRequest) {
     getDatasets(),
   ]);
 
-  const safeInstitutions = institutions.map(i => ({ ...i, _id: i._id?.toString() }));
-  const safeUsers = users.map(u => ({ ...u, _id: u._id?.toString(), institutionId: u.institutionId?.toString() }));
-  const safeDatasets = datasets.map(d => ({ ...d, _id: d._id?.toString() }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeInstitutions = institutions.map((i: any) => ({ ...i, _id: i._id?.toString() }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeUsers = users.map((u: any) => ({ ...u, _id: u._id?.toString(), institutionId: u.institutionId?.toString() }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeDatasets = datasets.map((d: any) => ({ ...d, _id: d._id?.toString() }));
 
   return NextResponse.json({ institutions: safeInstitutions, users: safeUsers, datasets: safeDatasets });
 }

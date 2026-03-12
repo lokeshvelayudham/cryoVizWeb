@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
       });
 
       // Restore mapped id and json fields
-      const safeUploads = uploads.map(u => ({ 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const safeUploads = uploads.map((u: any) => ({ 
         ...u, 
         _id: u.id,
         result: u.result ? JSON.parse(u.result) : undefined,

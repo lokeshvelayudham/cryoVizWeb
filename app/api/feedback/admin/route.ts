@@ -24,7 +24,8 @@ export async function GET() {
       take: 100
     });
 
-    const formattedFeedback = feedback.map(f => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formattedFeedback = feedback.map((f: any) => ({
       ...f,
       _id: f.id,
     }));

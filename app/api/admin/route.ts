@@ -181,8 +181,9 @@ export async function PUT(request: NextRequest) {
         } & Partial<Institution>;
         if (!b._id) return NextResponse.json({ error: "_id required" }, { status: 400 });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const inst: any = {
-          ...(b as any),
+          ...b,
           _id: b._id,
         };
         const result = await updateInstitution(inst);
@@ -198,8 +199,9 @@ export async function PUT(request: NextRequest) {
           return NextResponse.json({ error: "Missing _id/email" }, { status: 400 });
         }
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const user: any = {
-          ...(b as any),
+          ...b,
           _id: b._id,
           institutionId: b.institutionId,
           logins: b.logins ?? 0,
@@ -216,8 +218,9 @@ export async function PUT(request: NextRequest) {
         } & Partial<Dataset>;
         if (!b._id) return NextResponse.json({ error: "_id required" }, { status: 400 });
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dataset: any = {
-          ...(b as any),
+          ...b,
           _id: b._id,
         };
         const result = await updateDataset(dataset);

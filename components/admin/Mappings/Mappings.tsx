@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -40,6 +40,9 @@ export default function DatasetMappingsPage() {
     })();
   }, []);
 
+  const getDatasetName = useCallback((id: string) =>
+    datasets.find((d) => d._id?.toString() === id)?.name || "Unknown", [datasets]);
+
   // load mapping when parent changes
   useEffect(() => {
     if (!parentId) {
@@ -60,7 +63,7 @@ export default function DatasetMappingsPage() {
         }))
       );
     })();
-  }, [parentId]);
+  }, [parentId, getDatasetName]);
 
   useEffect(() => {
     (async () => {
@@ -87,8 +90,7 @@ export default function DatasetMappingsPage() {
     () => new Set(mappings.map((m) => m.parentId)),
     [mappings]
   );
-  const getDatasetName = (id: string) =>
-    datasets.find((d) => d._id?.toString() === id)?.name || "Unknown";
+
 
   const filteredPool = useMemo(() => {
     const term = search.trim().toLowerCase();

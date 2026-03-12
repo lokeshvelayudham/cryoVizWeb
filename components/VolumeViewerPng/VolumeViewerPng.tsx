@@ -143,15 +143,6 @@ function downsampleVolume(
   return { data: out, width: nw, height: nh, depth: nd };
 }
 
-/** Custom hook: debounces a value so rapid updates (slider drags) are coalesced */
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = React.useState(value);
-  React.useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(id);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 // --------------- Component ---------------
 

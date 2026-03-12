@@ -31,7 +31,6 @@ try {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var _redisClientPromise: Redis | undefined;
 }
 

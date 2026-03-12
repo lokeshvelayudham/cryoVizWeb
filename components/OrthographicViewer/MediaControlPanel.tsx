@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Folder, X, Download, List } from "lucide-react";
 import Draggable from "react-draggable";
+import Image from "next/image";
 
 interface MediaFile {
   id: string;
@@ -110,7 +111,7 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
         </video>
       );
     } else if (["jpeg", "jpg", "png"].includes(ext)) {
-      return <img src={file.url} alt={file.name} className="w-full h-auto max-h-64" />;
+      return <Image src={file.url} alt={file.name} width={400} height={256} className="w-full h-auto max-h-64" style={{ objectFit: 'contain' }} />;
     } else if (ext === "pdf") {
       return (
         <iframe
@@ -144,6 +145,7 @@ export default function MediaControlPanel({ datasetId, setErrorMessage }: MediaC
 
   useEffect(() => {
     if (userEmail) fetchFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEmail]);
 
   useEffect(() => {

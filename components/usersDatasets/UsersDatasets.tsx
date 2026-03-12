@@ -106,9 +106,7 @@ export default function UsersDatasets() {
   // ------- Derivations & UI state (all hooks declared unconditionally) --------
 
   const institutions = baseData?.institutions ?? [];
-  const datasets = baseData?.datasets ?? [];
   const currentUser = baseData?.currentUser ?? ({} as User);
-  const allMappings = mappingData?.mappings ?? [];
 
   const [search, setSearch] = React.useState("");
   const [instFilter, setInstFilter] = React.useState<string>("all");
@@ -120,31 +118,34 @@ export default function UsersDatasets() {
   }, [search, instFilter, pageSize]);
 
   const datasetById = React.useMemo(() => {
+    const ds = baseData?.datasets ?? [];
     const m = new Map<string, Dataset>();
-    for (const d of datasets) {
+    for (const d of ds) {
       if (d._id) m.set(d._id.toString(), d);
     }
     return m;
-  }, [datasets]);
+  }, [baseData?.datasets]);
 
   const institutionById = React.useMemo(() => {
+    const insts = baseData?.institutions ?? [];
     const m = new Map<string, Institution>();
-    for (const inst of institutions) {
+    for (const inst of insts) {
       if (inst._id) m.set(inst._id.toString(), inst);
     }
     return m;
-  }, [institutions]);
+  }, [baseData?.institutions]);
 
   const mappedParentIds = React.useMemo(
-    () => new Set(allMappings.map((m) => m.parentId)),
-    [allMappings]
+    () => new Set((mappingData?.mappings ?? []).map((m) => m.parentId)),
+    [mappingData?.mappings]
   );
 
   const mappedChildIds = React.useMemo(() => {
+    const maps = mappingData?.mappings ?? [];
     const s = new Set<string>();
-    for (const m of allMappings) for (const c of m.children || []) s.add(c.datasetId);
+    for (const m of maps) for (const c of m.children || []) s.add(c.datasetId);
     return s;
-  }, [allMappings]);
+  }, [mappingData?.mappings]);
 
   const assignedSet = React.useMemo(
     () => new Set(currentUser?.assignedDatasets || []),
@@ -152,15 +153,16 @@ export default function UsersDatasets() {
   );
 
   const visibleMappings = React.useMemo(() => {
+    const maps = mappingData?.mappings ?? [];
     if (!currentUser?.accessLevel) return [];
-    if (currentUser.accessLevel === "admin") return allMappings;
+    if (currentUser.accessLevel === "admin") return maps;
 
-    return allMappings.filter((m) => {
+    return maps.filter((m) => {
       const parentOk = assignedSet.has(m.parentId);
       const childOk = (m.children || []).some((c) => assignedSet.has(c.datasetId));
       return parentOk || childOk;
     });
-  }, [allMappings, currentUser?.accessLevel, assignedSet]);
+  }, [mappingData?.mappings, currentUser?.accessLevel, assignedSet]);
 
   const mappingViews: MappingView[] = React.useMemo(() => {
     return visibleMappings.map((m) => ({
@@ -174,11 +176,12 @@ export default function UsersDatasets() {
   }, [visibleMappings, datasetById]);
 
   const standaloneDatasets = React.useMemo(() => {
-    return datasets.filter((d) => {
+    const ds = baseData?.datasets ?? [];
+    return ds.filter((d) => {
       const id = d._id?.toString() || "";
       return !mappedParentIds.has(id) && !mappedChildIds.has(id);
     });
-  }, [datasets, mappedParentIds, mappedChildIds]);
+  }, [baseData?.datasets, mappedParentIds, mappedChildIds]);
 
   const filteredMappingViews = React.useMemo(() => {
     const term = search.trim().toLowerCase();

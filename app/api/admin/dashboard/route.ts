@@ -3,11 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-// Define proper types for the data structures
-interface DatasetStat {
-  _id: string;
-  count: number;
-}
 
 
 // Define types for POST request actions
@@ -118,6 +113,7 @@ export async function GET() {
       lastCheck: new Date().toISOString()
     };
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const systemMetrics: any[] = [];
 
     return NextResponse.json({
@@ -140,9 +136,10 @@ export async function GET() {
       }
     });
 
-  } catch (error: any) {
-    console.error("Dashboard API error:", error?.message || error);
-    return NextResponse.json({ error: error?.message || "Failed to fetch dashboard data" }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Dashboard API error:", message);
+    return NextResponse.json({ error: message || "Failed to fetch dashboard data" }, { status: 500 });
   }
 }
 

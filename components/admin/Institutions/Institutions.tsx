@@ -125,10 +125,11 @@ export default function Institutions() {
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={row.original.name}>
+        <div className="truncate" title={row.original.name}>
           {row.original.name}
         </div>
       ),
+      size: 200,
     },
     {
       accessorKey: "abbr",
@@ -149,10 +150,11 @@ export default function Institutions() {
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="max-w-[80px] sm:max-w-[100px] truncate" title={row.original.abbr}>
+        <div className="truncate" title={row.original.abbr}>
           {row.original.abbr}
         </div>
       ),
+      size: 80,
     },
     {
       accessorKey: "type",
@@ -173,46 +175,21 @@ export default function Institutions() {
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="max-w-[100px] sm:max-w-[150px] truncate" title={row.original.type}>
+        <div className="truncate" title={row.original.type}>
           {row.original.type}
         </div>
       ),
-    },
-    {
-      accessorKey: "address",
-      header: "Address",
-      cell: ({ row }) => (
-        <div className="max-w-[200px] sm:max-w-[300px] truncate" title={row.original.address}>
-          {row.original.address}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "phone",
-      header: "Phone Number",
-      cell: ({ row }) => (
-        <div className="max-w-[120px] sm:max-w-[150px] truncate" title={row.original.phone}>
-          {row.original.phone}
-        </div>
-      ),
+      size: 100,
     },
     {
       accessorKey: "email",
       header: "Email",
       cell: ({ row }) => (
-        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={row.original.email}>
+        <div className="truncate" title={row.original.email}>
           {row.original.email}
         </div>
       ),
-    },
-    {
-      accessorKey: "website",
-      header: "Website",
-      cell: ({ row }) => (
-        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={row.original.website}>
-          {row.original.website}
-        </div>
-      ),
+      size: 200,
     },
     {
       accessorKey: "status",
@@ -232,15 +209,24 @@ export default function Institutions() {
           )}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="max-w-[80px] sm:max-w-[100px] truncate" title={row.original.status}>
-          {row.original.status}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const status = row.original.status;
+        const statusStyles = {
+          Active: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+          Inactive: "bg-red-500/10 text-red-500 border-red-500/20",
+          Hold: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+        };
+        return (
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusStyles[status] || "bg-muted text-muted-foreground"}`}>
+            {status}
+          </span>
+        );
+      },
+      size: 90,
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "",
       cell: ({ row }) => {
         const institution = row.original;
         return (
@@ -248,8 +234,7 @@ export default function Institutions() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-8 w-8 p-0 hover:bg-gray-200"
-                style={{ display: "block !important" }}
+                className="h-8 w-8 p-0 hover:bg-muted"
                 onClick={(e) => e.stopPropagation()}
               >
                 <span className="sr-only">Open menu</span>
@@ -272,6 +257,7 @@ export default function Institutions() {
           </DropdownMenu>
         );
       },
+      size: 50,
     },
   ];
 
@@ -314,7 +300,7 @@ export default function Institutions() {
       });
       if (response.ok) {
         fetchInstitutions();
-        setIsViewOpen(false); // Close view modal if open
+        setIsViewOpen(false);
       } else {
         alert("Failed to delete institution");
       }
@@ -379,19 +365,19 @@ export default function Institutions() {
   if (loading) return <div className="p-4">Loading institutions...</div>;
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
+    <div className="w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
         <Input
           placeholder="Search institutions..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-sm"
         />
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> New Institution
+              <Button size="sm">
+                <Plus className="mr-1 h-4 w-4" /> New Institution
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -426,8 +412,8 @@ export default function Institutions() {
           </Dialog>
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> New User
+              <Button size="sm">
+                <Plus className="mr-1 h-4 w-4" /> New User
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -445,13 +431,17 @@ export default function Institutions() {
           </Dialog>
         </div>
       </div>
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-hidden">
+        <Table className="table-fixed w-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead
+                    key={header.id}
+                    className="truncate"
+                    style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
+                  >
                     {flexRender(
                       header.column.columnDef.header,
                       header.getContext()
@@ -466,7 +456,7 @@ export default function Institutions() {
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="truncate">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -485,44 +475,46 @@ export default function Institutions() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
-        <span className="text-sm">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-4">
+        <span className="text-sm text-muted-foreground">
           Page {table.getState().pagination.pageIndex + 1} of{" "}
           {table.getPageCount()}
         </span>
-        <Select
-          value={table.getState().pagination.pageSize.toString()}
-          onValueChange={(value) => {
-            table.setPageSize(Number(value));
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select page size" />
-          </SelectTrigger>
-          <SelectContent>
-            {[10, 20, 30, 50].map((pageSize) => (
-              <SelectItem key={pageSize} value={pageSize.toString()}>
-                Show {pageSize}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+          <Select
+            value={table.getState().pagination.pageSize.toString()}
+            onValueChange={(value) => {
+              table.setPageSize(Number(value));
+            }}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Size" />
+            </SelectTrigger>
+            <SelectContent>
+              {[10, 20, 30, 50].map((pageSize) => (
+                <SelectItem key={pageSize} value={pageSize.toString()}>
+                  Show {pageSize}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       {selectedInstitution && (
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>

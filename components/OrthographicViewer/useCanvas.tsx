@@ -161,17 +161,7 @@ export default function useCanvas(
     });
   }, []);
 
-  /** Load images in batches to avoid overwhelming the network */
-  const loadImageBatch = useCallback(async (urls: string[]): Promise<HTMLImageElement[]> => {
-    const BATCH_SIZE = 30;
-    const results: HTMLImageElement[] = [];
-    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-      const batch = urls.slice(i, i + BATCH_SIZE);
-      const imgs = await Promise.all(batch.map(u => loadSingleImage(u)));
-      results.push(...imgs);
-    }
-    return results;
-  }, [loadSingleImage]);
+
 
   const preloadImages = useCallback(async () => {
     setLoading(true);
@@ -382,7 +372,9 @@ export default function useCanvas(
     zoomYZ,
     measureData,
     dimensions,
-    scaledDimensions
+    scaledDimensions,
+    drawCrosshair,
+    drawMeasurement,
   ]);
 
   // Utility function to convert screen coordinates to image coordinates for scaled canvases
@@ -448,7 +440,7 @@ export default function useCanvas(
 
       setCoords(newCoords);
     },
-    [coords, zoomXY, zoomXZ, zoomYZ, dimensions, scaledDimensions, setCoords, numX, numY, numZ, getScaledImageCoordinates]
+    [coords, zoomXY, zoomXZ, zoomYZ, panXY, panXZ, panYZ, setCoords, numX, numY, numZ, getScaledImageCoordinates]
   );
 
   const handleWheel = useCallback(
@@ -484,11 +476,6 @@ export default function useCanvas(
   );
 
 
-const panMap = {
-  XY: [panRefXY, setPanXY],
-  XZ: [panRefXZ, setPanXZ],
-  YZ: [panRefYZ, setPanYZ],
-} as const;
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -498,7 +485,13 @@ const panMap = {
       const dy = e.clientY - lastMouse.current.y;
       lastMouse.current = { x: e.clientX, y: e.clientY };
 
-      const panState = panMap[isPanningRef.current];
+      const localPanMap = {
+        XY: [panRefXY, setPanXY],
+        XZ: [panRefXZ, setPanXZ],
+        YZ: [panRefYZ, setPanYZ],
+      } as const;
+
+      const panState = localPanMap[isPanningRef.current];
 
       if (panState) {
         const [ref, set] = panState;

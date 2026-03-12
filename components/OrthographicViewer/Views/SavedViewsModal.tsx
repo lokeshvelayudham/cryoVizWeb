@@ -263,6 +263,7 @@ export default function SavedViewsModal({
     if (isOpen) {
       setListModalPosition({ x: 20, y: 20 }); // Reset to top-left on open
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, userEmail, datasetId]);
 
   useEffect(() => {

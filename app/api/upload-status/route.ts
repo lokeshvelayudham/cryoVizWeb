@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Upload ID is required" }, { status: 400 });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
       status,
       progress: Math.max(0, Math.min(100, progress || 0)),

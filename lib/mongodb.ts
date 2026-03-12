@@ -21,7 +21,6 @@ if (typeof window === "undefined" && process.env.MONGODB_URI) {
 
 declare global {
   // allow global to have _mongoClientPromise
-  // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 

@@ -122,6 +122,7 @@ export default function AdminFeedbackPage() {
   // Load feedback on component mount
   useEffect(() => {
     fetchFeedback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   // Filter feedback based on current filters

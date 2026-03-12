@@ -170,36 +170,36 @@ async function main() {
   console.log(`Migrated ${mapCount} mappings.`);
 
   // 6. Studies
-  console.log('--- Migrating Studies ---');
-  const studies = await db.collection('studies').find({}).toArray();
-  let studyCount = 0;
-  for (const s of studies) {
-    const dExists = await prisma.dataset.findUnique({ where: { id: s.datasetId.toString() }});
-    const uExists = await prisma.user.findUnique({ where: { email: s.user }});
-    if (!dExists || !uExists || !s.name) continue;
+  console.log('--- Migrating Studies (Skipped - Schema changed) ---');
+  // const studies = await db.collection('studies').find({}).toArray();
+  // let studyCount = 0;
+  // for (const s of studies) {
+  //   const dExists = await prisma.dataset.findUnique({ where: { id: s.datasetId.toString() }});
+  //   const uExists = await prisma.user.findUnique({ where: { email: s.user }});
+  //   if (!dExists || !uExists || !s.name) continue;
 
-    await prisma.study.upsert({
-      where: {
-        name_datasetId_userEmail: {
-          name: s.name,
-          datasetId: s.datasetId.toString(),
-          userEmail: s.user
-        }
-      },
-      update: {},
-      create: {
-        id: s._id.toString(),
-        name: s.name,
-        description: s.description || null,
-        userEmail: s.user,
-        datasetId: s.datasetId.toString(),
-        createdAt: s.createdAt || new Date(),
-        updatedAt: s.updatedAt || new Date(),
-      }
-    });
-    studyCount++;
-  }
-  console.log(`Migrated ${studyCount} studies.`);
+  //   await prisma.study.upsert({
+  //     where: {
+  //       name_datasetId_userEmail: {
+  //         name: s.name,
+  //         datasetId: s.datasetId.toString(),
+  //         userEmail: s.user
+  //       }
+  //     },
+  //     update: {},
+  //     create: {
+  //       id: s._id.toString(),
+  //       name: s.name,
+  //       description: s.description || null,
+  //       userEmail: s.user,
+  //       datasetId: s.datasetId.toString(),
+  //       createdAt: s.createdAt || new Date(),
+  //       updatedAt: s.updatedAt || new Date(),
+  //     }
+  //   });
+  //   studyCount++;
+  // }
+  // console.log(`Migrated ${studyCount} studies.`);
 
   // 7. Annotations
   console.log('--- Migrating Annotations ---');
@@ -225,7 +225,7 @@ async function main() {
         instance: a.instance || 0,
         userEmail: a.user,
         status: a.status || 'active',
-        studyName: a.studyName || 'Default Study',
+        groupName: a.studyName || 'Default Group',
         datasetId: a.datasetId.toString(),
         datetime: a.datetime || Date.now(),
       }

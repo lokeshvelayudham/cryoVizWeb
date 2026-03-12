@@ -54,7 +54,9 @@ export function UploadStatusTable() {
       upload.status === "pending" || upload.status === "processing"
     );
     setIsPolling(hasActiveUploads);
-  }, [uploads]);
+    // Stable reference from useQuery, safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploads.length]);
 
   // Reset to first page when page size changes
   useEffect(() => {

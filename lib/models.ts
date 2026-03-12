@@ -151,7 +151,8 @@ export async function updateInstitution(institution: Institution) {
     const id = institution._id || institution.id;
     if (!id) throw new Error("Institution _id is required for update");
     
-    const { _id, id: _droppedId, createdAt, ...updateData } = institution;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _unusedId, id: _droppedId, createdAt: _createdAt, ...updateData } = institution;
     
     await prisma.institution.update({
       where: { id },
@@ -206,7 +207,8 @@ export async function updateUser(user: User) {
       }
     }
 
-    const { _id, id: _droppedId, assignedDatasets, ...updateData } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _unusedId, id: _droppedId, assignedDatasets: _assignedDatasets, ...updateData } = user;
     
     await prisma.user.update({
       where: { id },
@@ -290,7 +292,8 @@ export async function updateDataset(dataset: Dataset) {
     const id = dataset._id || dataset.id;
     if (!id) throw new Error("Dataset _id is required for update");
     
-    const { _id, id: _droppedId, createdAt, assignedUsers, ...updateData } = dataset;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _id: _unusedId, id: _droppedId, createdAt: _createdAt, assignedUsers: _assignedUsers, ...updateData } = dataset;
     
     await prisma.dataset.update({
       where: { id },

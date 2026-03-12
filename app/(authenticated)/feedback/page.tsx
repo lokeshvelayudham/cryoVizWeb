@@ -118,6 +118,7 @@ export default function FeedbackPage() {
   // Load feedback on component mount
   useEffect(() => {
     fetchFeedback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   const getStatusColor = (status: Feedback['status']) => {

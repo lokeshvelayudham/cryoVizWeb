@@ -32,7 +32,7 @@ export function LoginForm({
     let check;
     try {
       check = await resCheck.json();
-    } catch (e) {
+    } catch {
       setLoading(false);
       setMessage("Server connection failed during user check.");
       return;
@@ -63,7 +63,7 @@ export function LoginForm({
         try {
           const errorData = await otpRes.json();
           if (errorData.error) errorMsg = errorData.error;
-        } catch (e) {}
+        } catch { /* ignore JSON parse error */ }
         setMessage(errorMsg);
       }
     } catch (err: unknown) {

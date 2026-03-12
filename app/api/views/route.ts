@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "name, coords, zoom, pan, creator, and datasetId are required" }, { status: 400 });
     }
 
-    let userEmail = body.creator;
+    const userEmail = body.creator;
     const userExists = await prisma.user.findUnique({ where: { email: userEmail } });
     if (!userExists) {
       return NextResponse.json({ error: "User does not exist" }, { status: 400 });
@@ -94,7 +94,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "View not found" }, { status: 404 });
     }
 
-    const result = await prisma.view.update({
+    await prisma.view.update({
       where: { id: id },
       data: { name }
     });

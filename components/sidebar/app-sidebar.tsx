@@ -13,6 +13,7 @@ import {
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 
 import { User, Dataset, Institution, DatasetMapping } from "@/lib/models";
 
@@ -113,14 +114,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // --- Derive current mapping context from URL ---
   const activeDatasetId = searchParams.get("datasetId") || "";
 
-  const datasets = adminData?.datasets ?? [];
-  const currentUser = adminData?.currentUser as User | undefined;
-
   const datasetById = React.useMemo(() => {
+    const ds = adminData?.datasets ?? [];
     const m = new Map<string, Dataset>();
-    for (const d of datasets) if (d._id) m.set(d._id.toString(), d);
+    for (const d of ds) if (d._id) m.set(d._id.toString(), d);
     return m;
-  }, [datasets]);
+  }, [adminData?.datasets]);
+
+  const currentUser = adminData?.currentUser as User | undefined;
 
   const assignedSet = React.useMemo(
     () => new Set(currentUser?.assignedDatasets || []),
@@ -128,20 +129,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 
   // Find mapping where active id is the parent or appears among children
-  const allMappings = mappingData?.mappings ?? [];
   const activeMapping = React.useMemo(() => {
+    const maps = mappingData?.mappings ?? [];
     if (!activeDatasetId) return null;
 
     // 1) Is it a parent?
-    let found = allMappings.find((m) => m.parentId === activeDatasetId);
+    let found = maps.find((m) => m.parentId === activeDatasetId);
     if (found) return found;
 
     // 2) Is it a child?
-    found = allMappings.find((m) =>
+    found = maps.find((m) =>
       (m.children || []).some((c) => c.datasetId === activeDatasetId)
     );
     return found || null;
-  }, [allMappings, activeDatasetId]);
+  }, [mappingData?.mappings, activeDatasetId]);
 
   // Parent to display (if any)
   const parentIdToShow = React.useMemo(() => {
@@ -166,6 +167,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       };
     });
   }, [activeMapping, datasetById, currentUser?.accessLevel, assignedSet, activeDatasetId]);
+
 
   // Computed parent item
   const parentItem = React.useMemo(() => {
@@ -273,9 +275,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuButton size="lg" asChild>
                 <a href="#">
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src="/images/biv-logo.png"
                       alt="CryoViz Logo"
+                      width={32}
+                      height={32}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -305,9 +309,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuButton size="lg" asChild>
                 <a href="#">
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src="/images/biv-logo.png"
                       alt="CryoViz Logo"
+                      width={32}
+                      height={32}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -341,9 +347,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild>
               <a href="#">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
-                  <img
+                  <Image
                     src="/images/biv-logo.png"
                     alt="CryoViz Logo"
+                    width={32}
+                    height={32}
                     className="w-full h-full object-contain"
                   />
                 </div>

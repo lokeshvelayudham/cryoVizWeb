@@ -356,6 +356,7 @@ export default function OrthographicViewer(props: ViewerProps) {
             />
             {showAnnotations &&
               (selectedGroup ? currentGroupAnnotations : annotations).map(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (a: any) =>
                   a.view === "XY" &&
                   a.slice === coords.z && (
@@ -426,6 +427,7 @@ export default function OrthographicViewer(props: ViewerProps) {
               />
               {showAnnotations &&
                 (selectedGroup ? currentGroupAnnotations : annotations).map(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (a: any) =>
                     a.view === "XZ" &&
                     a.slice === coords.y && (
@@ -494,6 +496,7 @@ export default function OrthographicViewer(props: ViewerProps) {
               />
               {showAnnotations &&
                 (selectedGroup ? currentGroupAnnotations : annotations).map(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (a: any) =>
                     a.view === "YZ" &&
                     a.slice === coords.x && (

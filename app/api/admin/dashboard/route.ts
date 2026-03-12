@@ -76,7 +76,7 @@ export async function GET() {
       select: { name: true, email: true, accessLevel: true, lastLogin: true }
     });
 
-    const userActivity = users.map(u => ({
+    const userActivity = users.map((u: { name: string | null; email: string | null; accessLevel: string; lastLogin: Date | null }) => ({
       name: u.name,
       email: u.email,
       accessLevel: u.accessLevel,

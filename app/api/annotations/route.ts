@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const formattedAnnotations = annotations.map((item) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formattedAnnotations = annotations.map((item: any) => ({
       ...item,
       _id: item.id,            // Prisma's cuid maps to MongoDB's _id
       id: item.annotationId,   // Prisma's annotationId maps to frontend's id

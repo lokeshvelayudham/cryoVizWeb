@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -13,20 +12,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db();
+    const existingDataset = await prisma.dataset.findUnique({
+      where: { id: datasetId }
+    });
 
-    const result = await db.collection("datasets").updateOne(
-      { _id: new ObjectId(datasetId) },
-      { $set: { spacing: spacing } }
-    );
-
-    if (result.matchedCount === 0) {
+    if (!existingDataset) {
       return NextResponse.json(
         { error: "Dataset not found" },
         { status: 404 }
       );
     }
+
+    await prisma.dataset.update({
+      where: { id: datasetId },
+      data: { spacing: spacing }
+    });
 
     return NextResponse.json({ 
       success: true, 

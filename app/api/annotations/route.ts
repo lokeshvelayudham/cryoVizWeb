@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
 interface Annotation {
   _id?: string;
-  id: string;
+  id: string; // the frontend unique ID, mapped to annotationId in Prisma
   view: string;
   slice: number;
   x: number;
@@ -15,9 +14,9 @@ interface Annotation {
   instance: number;
   datetime: number;
   user: string;
-  datasetId: string; // Changed from dataset to datasetId
+  datasetId: string;
   status: string;
-  studyName?: string; // Add study name field
+  groupName?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -28,24 +27,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
     }
 
-    const datasetId = req.nextUrl.searchParams.get("datasetId"); // Changed to datasetId
+    const datasetId = req.nextUrl.searchParams.get("datasetId");
     if (!datasetId) {
       return NextResponse.json({ error: "Dataset ID is required" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    const annotations = await db
-      .collection("annotations")
-      .find({ datasetId, user: userEmail, status: "active" }) // Changed to datasetId
-      .toArray();
+    const annotations = await prisma.annotation.findMany({
+      where: {
+        datasetId,
+        userEmail,
+        status: "active"
+      }
+    });
 
     const formattedAnnotations = annotations.map((item) => ({
       ...item,
-      _id: item._id.toString(),
+      _id: item.id,            // Prisma's cuid maps to MongoDB's _id
+      id: item.annotationId,   // Prisma's annotationId maps to frontend's id
+      user: item.userEmail,
     }));
 
-    console.log("GET annotations:", formattedAnnotations.map(a => ({ _id: a._id, id: (a as Annotation).id, user: (a as Annotation).user, datasetId })));
     return NextResponse.json(formattedAnnotations, { status: 200 });
   } catch (error) {
     console.error("Error fetching annotations:", error);
@@ -65,7 +66,6 @@ export async function POST(req: NextRequest) {
     }
 
     const annotation: Annotation = await req.json();
-    console.log("POST request payload:", { id: annotation.id, user: userEmail, text: annotation.text, datasetId: annotation.datasetId });
 
     if (!annotation.text || typeof annotation.text !== "string" || annotation.text.trim() === "") {
       return NextResponse.json({ error: "Annotation text cannot be empty" }, { status: 400 });
@@ -75,25 +75,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields or dataset ID" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection("annotations").insertOne({
-      id: annotation.id,
-      view: annotation.view,
-      slice: annotation.slice,
-      x: annotation.x,
-      y: annotation.y,
-      text: annotation.text,
-      instance: annotation.instance,
-      user: userEmail,
-      datetime: Date.now(),
-      datasetId: annotation.datasetId, // Changed to datasetId
-      status: "active",
-      studyName: annotation.studyName || "Default Study", // Add study name
+    const result = await prisma.annotation.create({
+      data: {
+        annotationId: annotation.id,
+        view: annotation.view,
+        slice: annotation.slice,
+        x: annotation.x,
+        y: annotation.y,
+        text: annotation.text,
+        instance: annotation.instance,
+        userEmail: userEmail,
+        datetime: Date.now(),
+        datasetId: annotation.datasetId,
+        status: "active",
+        groupName: annotation.groupName || "Default Group",
+      }
     });
 
-    console.log("POST result:", { insertedId: result.insertedId.toString(), id: annotation.id });
-    return NextResponse.json({ _id: result.insertedId.toString(), id: annotation.id }, { status: 201 });
+    return NextResponse.json({ _id: result.id, id: annotation.id }, { status: 201 });
   } catch (error) {
     console.error("Error saving annotation:", error);
     if (error instanceof Error) {
@@ -112,7 +111,6 @@ export async function PUT(req: NextRequest) {
     }
 
     const annotation: Partial<Annotation> & { _id?: string; id: string } = await req.json();
-    console.log("PUT request payload:", { _id: annotation._id, id: annotation.id, user: userEmail, text: annotation.text, x: annotation.x, y: annotation.y, datasetId: annotation.datasetId });
 
     if (!annotation.text || typeof annotation.text !== "string" || annotation.text.trim() === "") {
       return NextResponse.json({ error: "Annotation text cannot be empty" }, { status: 400 });
@@ -126,41 +124,26 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Dataset ID is required" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    const query = annotation._id
-      ? { _id: new ObjectId(annotation._id), user: userEmail, datasetId: annotation.datasetId, status: "active" } // Changed to datasetId
-      : { id: annotation.id, user: userEmail, datasetId: annotation.datasetId, status: "active" }; // Changed to datasetId
+    const existingAnnotation = await prisma.annotation.findFirst({
+      where: annotation._id
+        ? { id: annotation._id, userEmail, datasetId: annotation.datasetId, status: "active" }
+        : { annotationId: annotation.id, userEmail, datasetId: annotation.datasetId, status: "active" }
+    });
 
-    console.log("PUT query:", query);
-
-    const existingAnnotations = await db.collection("annotations").find(query).toArray();
-    console.log("Existing annotations:", existingAnnotations.map(a => ({ _id: a._id.toString(), id: a.id, user: a.user, datasetId: annotation.datasetId })));
-
-    if (existingAnnotations.length === 0) {
-      console.error("Annotation not found:", { _id: annotation._id, id: annotation.id, user: userEmail, datasetId: annotation.datasetId });
+    if (!existingAnnotation) {
       return NextResponse.json({ error: "Annotation not found or not owned by user" }, { status: 404 });
     }
 
-    const updateData = {
-      x: annotation.x,
-      y: annotation.y,
-      text: annotation.text,
-      datetime: annotation.datetime || Date.now(),
-      datasetId: annotation.datasetId, // Changed to datasetId
-    };
+    await prisma.annotation.update({
+      where: { id: existingAnnotation.id },
+      data: {
+        x: annotation.x,
+        y: annotation.y,
+        text: annotation.text,
+        datetime: annotation.datetime || Date.now()
+      }
+    });
 
-    const result = await db.collection("annotations").updateOne(
-      query,
-      { $set: updateData }
-    );
-
-    if (result.matchedCount === 0) {
-      console.error("No documents matched for update:", { _id: annotation._id, id: annotation.id, user: userEmail, datasetId: annotation.datasetId });
-      return NextResponse.json({ error: "Annotation not found or not owned by user" }, { status: 404 });
-    }
-
-    console.log("Annotation updated:", { _id: annotation._id, id: annotation.id, user: userEmail, datasetId: annotation.datasetId });
     return NextResponse.json({ message: "Annotation updated successfully", id: annotation.id }, { status: 200 });
   } catch (error) {
     console.error("Error updating annotation:", error);
@@ -179,7 +162,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
     }
 
-    const { _id, datasetId } = await req.json(); // Changed to datasetId
+    const { _id, datasetId } = await req.json();
     if (!_id) {
       return NextResponse.json({ error: "Missing _id" }, { status: 400 });
     }
@@ -187,21 +170,18 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Dataset ID is required" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection("annotations").deleteOne({
-      _id: new ObjectId(_id),
-      user: userEmail,
-      datasetId, // Changed to datasetId
-      status: "active",
+    const existing = await prisma.annotation.findFirst({
+      where: { id: _id, userEmail, datasetId, status: "active" }
     });
 
-    if (result.deletedCount === 0) {
-      console.error("Annotation not found for deletion:", { _id, user: userEmail, datasetId });
+    if (!existing) {
       return NextResponse.json({ error: "Annotation not found or not owned by user" }, { status: 404 });
     }
 
-    console.log("Annotation deleted:", { _id, user: userEmail, datasetId });
+    await prisma.annotation.delete({
+      where: { id: _id }
+    });
+
     return NextResponse.json({ message: "Annotation deleted successfully", _id }, { status: 200 });
   } catch (error) {
     console.error("Error deleting annotation:", error);

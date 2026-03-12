@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
 // ----- Helpers -----
 const toJsonErr = (e: unknown) =>
@@ -8,8 +7,6 @@ const toJsonErr = (e: unknown) =>
 
 export async function POST(req: NextRequest) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     const datasetId = url.searchParams.get("datasetId");
@@ -19,35 +16,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "id, user, and datasetId are required" }, { status: 400 });
     }
 
-    const view = await db.collection("views").findOne({
-      _id: new ObjectId(id),
-      datasetId,
+    const view = await prisma.view.findFirst({
+      where: { id: id, datasetId: datasetId }
     });
+    
     if (!view) {
       return NextResponse.json({ error: "View not found" }, { status: 404 });
     }
 
-    const loadStats = view.loadStats || [];
+    const loadStats = view.loadStats ? JSON.parse(view.loadStats) : [];
     const userStat = loadStats.find((stat: { user: string }) => stat.user === user);
     const updatedStats = userStat
-      ? loadStats.map((stat: { user: string; count: number; lastLoad: Date }) =>
+      ? loadStats.map((stat: { user: string; count: number; lastLoad: string | Date }) =>
           stat.user === user
             ? { ...stat, count: stat.count + 1, lastLoad: new Date() }
             : stat
         )
       : [...loadStats, { user, count: 1, lastLoad: new Date() }];
 
-    const result = await db.collection("views").updateOne(
-      { _id: new ObjectId(id), datasetId },
-      { $set: { loadCount: view.loadCount + 1, loadStats: updatedStats } }
-    );
+    const result = await prisma.view.update({
+      where: { id: id },
+      data: {
+        loadCount: view.loadCount + 1,
+        loadStats: JSON.stringify(updatedStats),
+      }
+    });
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "View not found" }, { status: 404 });
-    }
+    const reconstructedView = {
+      ...result,
+      _id: result.id,
+      loadStats: updatedStats,
+      coords: result.coords ? JSON.parse(result.coords) : null,
+      pan: result.pan ? JSON.parse(result.pan) : null
+    };
 
     return NextResponse.json(
-      { message: "View loaded successfully", view: { ...view, loadCount: view.loadCount + 1, loadStats: updatedStats } },
+      { message: "View loaded successfully", view: reconstructedView },
       { status: 200 }
     );
   } catch (error) {

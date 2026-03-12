@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,28 +9,31 @@ export const revalidate = 0;
 // ---------- GET - Fetch user's notifications ----------
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    
-    // Get user ID from email
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Fetch user's notifications, sorted by timestamp (newest first)
-    const notifications = await db.collection("notifications")
-      .find({ userId: user._id.toString() })
-      .sort({ timestamp: -1 })
-      .limit(50) // Limit to last 50 notifications
-      .toArray();
+    const notifications = await prisma.notification.findMany({
+      where: { userId: user.id },
+      orderBy: { timestamp: 'desc' },
+      take: 50
+    });
 
-    return NextResponse.json({ notifications });
+    // Map id to _id and parse metadata for the frontend
+    const formattedNotifications = notifications.map(notif => ({
+      ...notif,
+      _id: notif.id,
+      metadata: notif.metadata ? JSON.parse(notif.metadata) : null,
+    }));
+
+    return NextResponse.json({ notifications: formattedNotifications });
   } catch (error) {
     console.error("GET /api/notifications error:", error);
     return NextResponse.json({ error: "Failed to fetch notifications" }, { status: 500 });
@@ -40,7 +43,7 @@ export async function GET() {
 // ---------- POST - Create notification (admin/system) ----------
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -48,47 +51,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId, type, title, message, priority = 'medium', metadata } = body;
 
-    // Validate required fields
     if (!userId || !type || !title || !message) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Validate notification type
     if (!['upload', 'system'].includes(type)) {
       return NextResponse.json({ error: "Invalid notification type" }, { status: 400 });
     }
 
-    // Validate priority
     if (!['high', 'medium', 'low'].includes(priority)) {
       return NextResponse.json({ error: "Invalid priority level" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Verify user exists
-    const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Create notification
-    const notification = {
-      userId,
-      type,
-      title,
-      message,
-      timestamp: new Date(),
-      read: false,
-      priority,
-      metadata
-    };
-
-    const result = await db.collection("notifications").insertOne(notification);
+    const notification = await prisma.notification.create({
+      data: {
+        userId,
+        type,
+        title,
+        message,
+        read: false,
+        priority,
+        metadata: metadata ? JSON.stringify(metadata) : null
+      }
+    });
     
     return NextResponse.json({ 
       success: true, 
-      id: result.insertedId.toString() 
+      id: notification.id 
     });
   } catch (error) {
     console.error("POST /api/notifications error:", error);
@@ -99,7 +94,7 @@ export async function POST(request: NextRequest) {
 // ---------- PUT - Mark notification as read ----------
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -115,30 +110,31 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Missing notification ID for mark-read action" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Get user ID from email
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     if (action === 'mark-read') {
-      // Mark single notification as read
-      const result = await db.collection("notifications").updateOne(
-        { _id: new ObjectId(notificationId), userId: user._id.toString() },
-        { $set: { read: true } }
-      );
+      // Find First to check ownership, then update
+      const existing = await prisma.notification.findFirst({
+        where: { id: notificationId, userId: user.id }
+      });
       
-      if (result.matchedCount === 0) {
+      if (!existing) {
         return NextResponse.json({ error: "Notification not found" }, { status: 404 });
       }
+
+      await prisma.notification.update({
+        where: { id: notificationId },
+        data: { read: true }
+      });
+
     } else if (action === 'mark-all-read') {
-      // Delete all user's notifications when marking all as read
-      await db.collection("notifications").deleteMany(
-        { userId: user._id.toString() }
-      );
+      // Just delete them to match existing logic
+      await prisma.notification.deleteMany({
+        where: { userId: user.id }
+      });
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -153,7 +149,7 @@ export async function PUT(request: NextRequest) {
 // ---------- DELETE - Delete notification ----------
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -165,24 +161,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Notification ID required" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Get user ID from email
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Delete notification (only if it belongs to the user)
-    const result = await db.collection("notifications").deleteOne({
-      _id: new ObjectId(notificationId),
-      userId: user._id.toString()
+    const existing = await prisma.notification.findFirst({
+      where: { id: notificationId, userId: user.id }
     });
 
-    if (result.deletedCount === 0) {
+    if (!existing) {
       return NextResponse.json({ error: "Notification not found" }, { status: 404 });
     }
+
+    await prisma.notification.delete({
+      where: { id: notificationId }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

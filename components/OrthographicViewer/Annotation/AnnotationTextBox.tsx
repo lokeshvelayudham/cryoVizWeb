@@ -12,7 +12,7 @@ type Annotation = {
   instance: number;
   datetime: number;
   user: string | null;
-  studyName?: string; // Add study name field
+  groupName?: string; // Add group name field
 };
 
 type Props = {
@@ -21,7 +21,7 @@ type Props = {
   zoomXY: number;
   panXY: { x: number; y: number };
   canvasRef: React.RefObject<HTMLCanvasElement>;
-  currentStudyName?: string; // Add current study context
+  currentGroupName?: string; // Add current group context
 };
 
 export default function AnnotationTextBox({ 
@@ -30,7 +30,7 @@ export default function AnnotationTextBox({
   zoomXY, 
   panXY, 
   canvasRef,
-  currentStudyName = "Default Study"
+  currentGroupName = "Default Group"
 }: Props) {
   const [editing, setEditing] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,15 +65,15 @@ export default function AnnotationTextBox({
       parentLeft: parentRect?.left,
       parentTop: parentRect?.top,
       offsetX,
-      studyName: annotation.studyName || currentStudyName,
+      groupName: annotation.groupName || currentGroupName,
     });
-  }, [screenX, screenY, annotation.x, annotation.y, zoomXY, panXY, canvasRect, parentRect, offsetX, annotation._id, annotation.studyName, currentStudyName]);
+  }, [screenX, screenY, annotation.x, annotation.y, zoomXY, panXY, canvasRect, parentRect, offsetX, annotation._id, annotation.groupName, currentGroupName]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       setEditing(false);
-      // Ensure the annotation has the current study name
-      const updatedAnnotation = { ...annotation, studyName: annotation.studyName || currentStudyName };
+      // Ensure the annotation has the current group name
+      const updatedAnnotation = { ...annotation, groupName: annotation.groupName || currentGroupName };
       onUpdate(updatedAnnotation._id || updatedAnnotation.id, updatedAnnotation.text, undefined, true);
     }
   };

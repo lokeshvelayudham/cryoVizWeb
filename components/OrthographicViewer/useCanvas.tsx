@@ -150,57 +150,100 @@ export default function useCanvas(
     }
   }, [blobUrl, dimensions, calculateOptimalScaling]);
 
-  const loadImageSet = useCallback(async (folder: string, count: number) => {
-    const promises: Promise<HTMLImageElement>[] = Array.from({ length: count }, (_, i) => {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous"; // Allow CORS for external URLs
-        img.src = `${blobUrl}/${folder}/${i.toString().padStart(3, "0")}.png`;
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load image ${i}`));
-      });
+  /** Load a single image by URL */
+  const loadSingleImage = useCallback((url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = url;
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Failed to load: ${url}`));
     });
+  }, []);
 
-    try {
-      const images = await Promise.all(promises);
-      return images;
-    } catch (error) {
-      throw new Error(`Error loading image set ${folder}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  /** Load images in batches to avoid overwhelming the network */
+  const loadImageBatch = useCallback(async (urls: string[]): Promise<HTMLImageElement[]> => {
+    const BATCH_SIZE = 30;
+    const results: HTMLImageElement[] = [];
+    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+      const batch = urls.slice(i, i + BATCH_SIZE);
+      const imgs = await Promise.all(batch.map(u => loadSingleImage(u)));
+      results.push(...imgs);
     }
-  }, [blobUrl]);
+    return results;
+  }, [loadSingleImage]);
 
   const preloadImages = useCallback(async () => {
     setLoading(true);
     try {
-      const [xy, xz, yz] = await Promise.all([
-        loadImageSet("xy", numZ),
-        loadImageSet("xz", numY),
-        loadImageSet("yz", numX),
+      // PHASE 1: Load ONLY the center slices (3 images) for instant LCP
+      const midZ = Math.floor(numZ / 2);
+      const midY = Math.floor(numY / 2);
+      const midX = Math.floor(numX / 2);
+
+      const pad = (n: number) => n.toString().padStart(3, "0");
+      const [centerXY, centerXZ, centerYZ] = await Promise.all([
+        loadSingleImage(`${blobUrl}/xy/${pad(midZ)}.png`),
+        loadSingleImage(`${blobUrl}/xz/${pad(midY)}.png`),
+        loadSingleImage(`${blobUrl}/yz/${pad(midX)}.png`),
       ]);
-      slicesXY.current = xy;
-      slicesXZ.current = xz;
-      slicesYZ.current = yz;
 
+      // Set up dimensions from the first loaded images
       const naturalDimensions = {
-        xy: { width: xy[0].naturalWidth, height: xy[0].naturalHeight },
-        xz: { width: xz[0].naturalWidth, height: xz[0].naturalHeight },
-        yz: { width: yz[0].naturalWidth, height: yz[0].naturalHeight },
+        xy: { width: centerXY.naturalWidth, height: centerXY.naturalHeight },
+        xz: { width: centerXZ.naturalWidth, height: centerXZ.naturalHeight },
+        yz: { width: centerYZ.naturalWidth, height: centerYZ.naturalHeight },
       };
-
       setDimensions(naturalDimensions);
-      
-      // Calculate optimal scaling for the viewport
       const optimalScaling = calculateOptimalScaling(naturalDimensions);
       setScaledDimensions(optimalScaling);
-      
+
+      // Initialize sparse arrays with center slices placed
+      const xyArr: HTMLImageElement[] = new Array(numZ);
+      const xzArr: HTMLImageElement[] = new Array(numY);
+      const yzArr: HTMLImageElement[] = new Array(numX);
+      xyArr[midZ] = centerXY;
+      xzArr[midY] = centerXZ;
+      yzArr[midX] = centerYZ;
+
+      slicesXY.current = xyArr;
+      slicesXZ.current = xzArr;
+      slicesYZ.current = yzArr;
+
       loaded.current = true;
-      setLoading(false);
+      setLoading(false); // Viewer is interactive now!
+
+      // PHASE 2: Load remaining slices in background batches
+      const makeUrls = (folder: string, count: number, skip: number) =>
+        Array.from({ length: count }, (_, i) => i)
+          .filter(i => i !== skip)
+          .map(i => ({ i, url: `${blobUrl}/${folder}/${pad(i)}.png` }));
+
+      const xyRemaining = makeUrls("xy", numZ, midZ);
+      const xzRemaining = makeUrls("xz", numY, midY);
+      const yzRemaining = makeUrls("yz", numX, midX);
+
+      // Load each axis in parallel, but each axis loads in batches internally
+      const loadAxis = async (items: { i: number; url: string }[], target: HTMLImageElement[]) => {
+        const BATCH = 30;
+        for (let b = 0; b < items.length; b += BATCH) {
+          const batch = items.slice(b, b + BATCH);
+          const imgs = await Promise.all(batch.map(item => loadSingleImage(item.url)));
+          batch.forEach((item, j) => { target[item.i] = imgs[j]; });
+        }
+      };
+
+      await Promise.all([
+        loadAxis(xyRemaining, slicesXY.current),
+        loadAxis(xzRemaining, slicesXZ.current),
+        loadAxis(yzRemaining, slicesYZ.current),
+      ]);
     } catch (error) {
       console.error("Error preloading images:", error);
       setErrorMessage(error instanceof Error ? error.message : "Failed to load images");
       setLoading(false);
     }
-  }, [blobUrl, numZ, numY, numX, loadImageSet, calculateOptimalScaling, setLoading, setErrorMessage]);
+  }, [blobUrl, numZ, numY, numX, loadSingleImage, calculateOptimalScaling, setLoading, setErrorMessage]);
 
   const drawCrosshair = useCallback(
     (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {

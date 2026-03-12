@@ -1,12 +1,17 @@
-// app/api/check-user/route.ts
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import prisma from "@/lib/prisma";
 
 export async function POST(req: Request) {
-  const { email } = await req.json();
-  const client = await clientPromise;
-  const db = client.db();
+  try {
+    const { email } = await req.json();
 
-  const user = await db.collection("users").findOne({ email });
-  return NextResponse.json({ exists: !!user });
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    return NextResponse.json({ exists: !!user });
+  } catch (error: any) {
+    console.error("Check user error:", error);
+    return NextResponse.json({ error: error.message || "Failed to check user" }, { status: 500 });
+  }
 }

@@ -1,236 +1,125 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
-interface Study {
-  _id?: string;
-  name: string;
-  datasetId: string;
-  user: string;
-  createdAt: Date;
-  updatedAt?: Date;
-  description?: string;
-  annotationCount?: number;
-}
+export const dynamic = "force-dynamic";
 
+// GET — list all studies (optionally filter by institutionId)
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
-    }
+    const { searchParams } = new URL(req.url);
+    const institutionId = searchParams.get("institutionId");
 
-    const datasetId = req.nextUrl.searchParams.get("datasetId");
-    if (!datasetId) {
-      return NextResponse.json({ error: "Dataset ID is required" }, { status: 400 });
-    }
+    const where = institutionId ? { institutionId } : {};
 
-    const client = await clientPromise;
-    const db = client.db();
-    const studies = await db
-      .collection("studies")
-      .find({ datasetId, user: userEmail })
-      .sort({ createdAt: -1 })
-      .toArray();
+    const studies = await prisma.study.findMany({
+      where,
+      include: { institution: { select: { id: true, name: true, abbr: true } } },
+      orderBy: { createdAt: "desc" },
+    });
 
-    if (!studies || studies.length === 0) {
-      return NextResponse.json([], { status: 200 });
-    }
-
-    const formattedStudies = studies.map((study) => ({
-      _id: study._id.toString(),
-      name: study.name,
-      datasetId: study.datasetId,
-      user: study.user,
-      createdAt: study.createdAt,
-      updatedAt: study.updatedAt,
-      description: study.description,
-      annotationCount: 0, // Will be calculated by frontend
+    const safeStudies = studies.map((s) => ({
+      _id: s.id,
+      ...s,
     }));
 
-    // console.log("GET studies:", formattedStudies.map(s => ({ _id: s._id, name: s.name, user: s.user, datasetId: s.datasetId })));
-    return NextResponse.json(formattedStudies, { status: 200 });
+    return NextResponse.json({ studies: safeStudies });
   } catch (error) {
-    console.error("Error fetching studies:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: `Failed to fetch studies: ${error.message}` }, { status: 500 });
-    }
+    console.error("GET /api/studies error:", error);
     return NextResponse.json({ error: "Failed to fetch studies" }, { status: 500 });
   }
 }
 
+// POST — create a new study
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+    const body = await req.json();
+    const { name, poNo, status, institutionId } = body;
+
+    if (!name || !institutionId) {
+      return NextResponse.json({ error: "name and institutionId are required" }, { status: 400 });
     }
 
-    const studyData: Omit<Study, "_id" | "user" | "createdAt"> = await req.json();
-    console.log("POST study request payload:", { name: studyData.name, user: userEmail, datasetId: studyData.datasetId });
-
-    if (!studyData.name || typeof studyData.name !== "string" || studyData.name.trim() === "") {
-      return NextResponse.json({ error: "Study name cannot be empty" }, { status: 400 });
+    // Validate institution exists
+    const institution = await prisma.institution.findUnique({ where: { id: institutionId } });
+    if (!institution) {
+      return NextResponse.json({ error: "Institution not found" }, { status: 404 });
     }
 
-    if (!studyData.datasetId) {
-      return NextResponse.json({ error: "Dataset ID is required" }, { status: 400 });
-    }
-
-    // Check if study name already exists for this user and dataset
-    const client = await clientPromise;
-    const db = client.db();
-
-    const existingStudy = await db.collection("studies").findOne({
-      name: studyData.name.trim(),
-      datasetId: studyData.datasetId,
-      user: userEmail
+    const study = await prisma.study.create({
+      data: {
+        name,
+        poNo: poNo || null,
+        status: status || "ongoing",
+        institutionId,
+      },
+      include: { institution: { select: { id: true, name: true, abbr: true } } },
     });
 
-    if (existingStudy) {
-      return NextResponse.json({ error: "Study with this name already exists" }, { status: 409 });
-    }
-
-    const now = new Date();
-    const newStudy: Omit<Study, "_id"> = {
-      name: studyData.name.trim(),
-      datasetId: studyData.datasetId,
-      user: userEmail,
-      createdAt: now,
-      updatedAt: now,
-      description: studyData.description,
-    };
-
-    const result = await db.collection("studies").insertOne(newStudy);
-
-    console.log("POST study result:", { insertedId: result.insertedId.toString(), name: newStudy.name });
-    return NextResponse.json({
-      _id: result.insertedId.toString(),
-      name: newStudy.name,
-      datasetId: newStudy.datasetId,
-      user: newStudy.user,
-      createdAt: newStudy.createdAt,
-      updatedAt: newStudy.updatedAt,
-      description: newStudy.description,
-      annotationCount: 0
-    }, { status: 201 });
+    return NextResponse.json({ success: true, study: { _id: study.id, ...study } });
   } catch (error) {
-    console.error("Error creating study:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: `Failed to create study: ${error.message}` }, { status: 500 });
-    }
+    console.error("POST /api/studies error:", error);
     return NextResponse.json({ error: "Failed to create study" }, { status: 500 });
   }
 }
 
+// PUT — update a study
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+    const body = await req.json();
+    const { id, name, poNo, status, institutionId } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const { _id, name, description } = await req.json();
-
-    if (!_id) {
-      return NextResponse.json({ error: "Study ID is required" }, { status: 400 });
+    const existing = await prisma.study.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Study not found" }, { status: 404 });
     }
 
-    if (!name || typeof name !== "string" || name.trim() === "") {
-      return NextResponse.json({ error: "Study name cannot be empty" }, { status: 400 });
-    }
+    const data: Record<string, unknown> = {};
+    if (name !== undefined) data.name = name;
+    if (poNo !== undefined) data.poNo = poNo;
+    if (status !== undefined) data.status = status;
+    if (institutionId !== undefined) data.institutionId = institutionId;
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    const result = await db.collection("studies").updateOne(
-      { _id: new ObjectId(_id), user: userEmail },
-      {
-        $set: {
-          name: name.trim(),
-          description,
-          updatedAt: new Date()
-        }
-      }
-    );
-
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "Study not found or access denied" }, { status: 404 });
-    }
-
-    console.log("PUT study result:", { _id, name: name.trim() });
-    return NextResponse.json({
-      success: true,
-      message: "Study updated successfully",
-      _id,
-      name: name.trim(),
-      description,
-      updatedAt: new Date()
+    const updated = await prisma.study.update({
+      where: { id },
+      data,
+      include: { institution: { select: { id: true, name: true, abbr: true } } },
     });
+
+    return NextResponse.json({ success: true, study: { _id: updated.id, ...updated } });
   } catch (error) {
-    console.error("Error updating study:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: `Failed to update study: ${error.message}` }, { status: 500 });
-    }
+    console.error("PUT /api/studies error:", error);
     return NextResponse.json({ error: "Failed to update study" }, { status: 500 });
   }
 }
 
+// DELETE — delete a study
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+    const body = await req.json();
+    const { id } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const { _id, datasetId } = await req.json();
-
-    if (!_id || !datasetId) {
-      return NextResponse.json({ error: "Study ID and Dataset ID are required" }, { status: 400 });
+    // Check if study has datasets
+    const datasetsCount = await prisma.dataset.count({ where: { studyId: id } });
+    if (datasetsCount > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete study: ${datasetsCount} dataset(s) are still mapped to it` },
+        { status: 400 }
+      );
     }
 
-    const client = await clientPromise;
-    const db = client.db();
+    await prisma.study.delete({ where: { id } });
 
-    // First, check if there are any annotations in this study
-    const annotationCount = await db.collection("annotations").countDocuments({
-      studyName: { $exists: true, $ne: null },
-      datasetId,
-      user: userEmail
-    });
-
-    if (annotationCount > 0) {
-      return NextResponse.json({
-        error: "Cannot delete study with existing annotations. Please reassign or delete annotations first."
-      }, { status: 400 });
-    }
-
-    const result = await db.collection("studies").deleteOne({
-      _id: new ObjectId(_id),
-      datasetId,
-      user: userEmail
-    });
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ error: "Study not found or access denied" }, { status: 404 });
-    }
-
-    console.log("DELETE study result:", { _id, datasetId });
-    return NextResponse.json({
-      success: true,
-      message: "Study deleted successfully"
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting study:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: `Failed to delete study: ${error.message}` }, { status: 500 });
-    }
+    console.error("DELETE /api/studies error:", error);
     return NextResponse.json({ error: "Failed to delete study" }, { status: 500 });
   }
 }

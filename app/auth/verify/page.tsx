@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot,
@@ -23,19 +24,18 @@ function OTPVerifyInner() {
     setLoading(true);
     setError("");
 
-    const res = await fetch("/api/auth/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
+    const res = await signIn("credentials", {
+      email,
+      otp,
+      callbackUrl: "/users_datasets",
     });
 
-    const result = await res.json();
     setLoading(false);
 
-    if (res.ok && result.success) {
+    if (res?.ok && !res?.error) {
       router.push("/users_datasets");
     } else {
-      setError(result.error || "Invalid OTP");
+      setError(res?.error || "Invalid OTP");
     }
   };
 

@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
+import prisma from "@/lib/prisma";
 import { createUploadNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-export interface UploadStatus {
-  _id?: string;
-  uploadId: string;
-  userId: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  progress: number; // 0-100
-  message: string;
-  datasetName: string;
-  startedAt: Date;
-  completedAt?: Date;
-  result?: { datasetId?: string };
-  error?: string;
-}
 
 // GET - Get upload status
 export async function GET(request: NextRequest) {
@@ -32,35 +18,40 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const uploadId = searchParams.get("uploadId");
 
-    const client = await clientPromise;
-    const db = client.db();
-
     if (uploadId) {
       // Get specific upload status
-      const upload = await db.collection<UploadStatus>("upload_status")
-        .findOne({ uploadId, userId: session.user.email });
+      const upload = await prisma.uploadStatus.findUnique({ 
+        where: { uploadId }
+      });
 
-      if (!upload) {
+      if (!upload || upload.userId !== session.user.email) {
         return NextResponse.json({ error: "Upload not found" }, { status: 404 });
       }
 
-      // Ensure we don't pass ObjectId directly to NextResponse.json to avoid serialization errors
-      const safeUpload = { ...upload, _id: upload._id?.toString() };
+      // Restore JSON fields and mapped id
+      const safeUpload = { 
+        ...upload, 
+        _id: upload.id,
+        result: upload.result ? JSON.parse(upload.result) : undefined,
+        error: upload.error ? JSON.parse(upload.error) : undefined
+      };
       return NextResponse.json(safeUpload);
     } else {
-      // Get all uploads for user, sort and limit in memory to avoid Cosmos DB index errors
-      const allUploads = await db.collection<UploadStatus>("upload_status")
-        .find({ userId: session.user.email })
-        .toArray();
+      // Get all uploads for user, sort and limit
+      const uploads = await prisma.uploadStatus.findMany({
+        where: { userId: session.user.email },
+        orderBy: { startedAt: 'desc' },
+        take: 20
+      });
 
-      const uploads = allUploads
-        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-        .slice(0, 20);
+      // Restore mapped id and json fields
+      const safeUploads = uploads.map(u => ({ 
+        ...u, 
+        _id: u.id,
+        result: u.result ? JSON.parse(u.result) : undefined,
+        error: u.error ? JSON.parse(u.error) : undefined
+      }));
 
-      // Ensure we don't pass ObjectId directly to NextResponse.json to avoid serialization errors
-      const safeUploads = uploads.map(u => ({ ...u, _id: u._id?.toString() }));
-
-      // Signal completion if any just completed (can be used by client to refresh datasets)
       return NextResponse.json({ uploads: safeUploads });
     }
   } catch (error) {
@@ -91,10 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Upload ID is required" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    const updateData: Partial<UploadStatus> = {
+    const updateData: any = {
       status,
       progress: Math.max(0, Math.min(100, progress || 0)),
       message: message || "",
@@ -102,41 +90,45 @@ export async function POST(request: NextRequest) {
 
     if (status === "completed") {
       updateData.completedAt = new Date();
-      updateData.result = result;
+      updateData.result = result ? JSON.stringify(result) : undefined;
     }
 
     if (status === "failed") {
       updateData.completedAt = new Date();
-      updateData.error = typeof error === 'object' && error !== null ? JSON.stringify(error) : (error ? String(error) : "Unknown error");
+      updateData.error = typeof error === 'object' && error !== null 
+        ? JSON.stringify(error) 
+        : (error ? String(error) : "Unknown error");
     }
 
-    // Update existing or create new
-    const result_op = await db.collection<UploadStatus>("upload_status").updateOne(
-      { uploadId, userId: isInternal ? body.userId : session!.user!.email },
-      {
-        $set: updateData,
-        $setOnInsert: {
-          uploadId,
-          userId: isInternal ? body.userId : session!.user!.email,
-          datasetName: datasetName || "Unknown Dataset",
-          startedAt: new Date(),
-        }
-      },
-      { upsert: true }
-    );
+    const userId = isInternal ? body.userId : session!.user!.email;
+
+    // Update existing or create new via Prisma Upsert
+    const uploadObj = await prisma.uploadStatus.upsert({
+      where: { uploadId },
+      update: updateData,
+      create: {
+        uploadId,
+        userId,
+        datasetName: datasetName || "Unknown Dataset",
+        startedAt: new Date(),
+        status,
+        progress: Math.max(0, Math.min(100, progress || 0)),
+        message: message || "",
+        result: status === "completed" && result ? JSON.stringify(result) : undefined,
+        error: status === "failed" ? updateData.error : undefined,
+      }
+    });
 
     // Create notification when upload completes successfully
-    if (status === "completed" && result_op.modifiedCount > 0) {
+    // We infer modification based on if it's currently completed
+    if (status === "completed" && uploadObj.status === "completed") {
       try {
-        const userId = isInternal ? body.userId : session!.user!.email;
-
-        // Get user ID from email for notification
-        const user = await db.collection("users").findOne({ email: userId });
+        const user = await prisma.user.findUnique({ where: { email: userId } });
         if (user && user.accessLevel === 'admin') {
           await createUploadNotification(
             uploadId,
             datasetName || "Unknown Dataset",
-            user._id.toString()
+            user.id
           );
         }
       } catch (notificationError) {
@@ -145,7 +137,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, modified: result_op.modifiedCount > 0 });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
     console.error("POST /api/upload-status error:", error);

@@ -1,30 +1,8 @@
 import { BlobServiceClient } from "@azure/storage-blob";
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
-
-// ----- Mongo setup -----
-let client: MongoClient | undefined;
-let connectionString: string | undefined;
-
-// Only initialize MongoDB connection during runtime, not build time
-if (typeof window === "undefined" && process.env.MONGODB_URI) {
-  connectionString = process.env.MONGODB_URI;
-  client = new MongoClient(connectionString);
-}
+import prisma from "@/lib/prisma";
 
 // ----- Types -----
-type MediaDoc = {
-  _id: ObjectId;
-  name: string;
-  dataset: string;
-  format: string;
-  URL: string;
-  chunkSize?: number;
-  length?: number;
-  uploadDate: Date;
-  user: string;
-};
-
 type ListFile = {
   id: string;
   name: string;
@@ -49,24 +27,18 @@ const toJsonErr = (e: unknown) =>
 // ----- GET -----
 export async function GET(req: NextRequest) {
   try {
-    if (!client || !connectionString) {
-      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
-    }
-
     const { searchParams } = new URL(req.url);
     const dataset = searchParams.get("dataset");
     if (!dataset) {
       return NextResponse.json({ error: "Dataset is required" }, { status: 400 });
     }
 
-    await client.connect();
-    const db = client.db();
-    const mediaCollection = db.collection<MediaDoc>("media");
-
-    const docs = await mediaCollection.find({ dataset }).toArray();
+    const docs = await prisma.mediaDoc.findMany({
+      where: { datasetId: dataset }
+    });
 
     const files: ListFile[] = docs.map((doc) => ({
-      id: doc._id.toString(),
+      id: doc.id,
       name: doc.name,
       tag: doc.format,
       url: doc.URL,
@@ -76,20 +48,12 @@ export async function GET(req: NextRequest) {
   } catch (e: unknown) {
     console.error("Error listing files:", e);
     return NextResponse.json(toJsonErr(e), { status: 500 });
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 
 // ----- POST -----
 export async function POST(req: NextRequest) {
   try {
-    if (!client || !connectionString) {
-      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
-    }
-
     const body: unknown = await req.json();
     if (
       !body ||
@@ -105,41 +69,28 @@ export async function POST(req: NextRequest) {
 
     const { dataset, filename, format, url, chunkSize, length, user } = body as PostBody;
 
-    await client.connect();
-    const db = client.db();
-    const mediaCollection = db.collection<MediaDoc>("media");
+    const mediaDoc = await prisma.mediaDoc.create({
+      data: {
+        name: filename,
+        format,
+        URL: url,
+        chunkSize,
+        length,
+        userEmail: user,
+        datasetId: dataset,
+      }
+    });
 
-    const uploadDate = new Date();
-    const metadata: Omit<MediaDoc, "_id"> = {
-      name: filename,
-      uploadDate,
-      dataset,
-      format,
-      URL: url,
-      chunkSize,
-      length,
-      user,
-    };
-
-    await mediaCollection.insertOne(metadata as unknown as MediaDoc);
-    return NextResponse.json({ message: "Metadata saved", metadata });
+    return NextResponse.json({ message: "Metadata saved", metadata: mediaDoc });
   } catch (e: unknown) {
     console.error("Error saving metadata:", e);
     return NextResponse.json(toJsonErr(e), { status: 500 });
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 
 // ----- DELETE -----
 export async function DELETE(req: NextRequest) {
   try {
-    if (!client || !connectionString) {
-      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
-    }
-
     const { searchParams } = new URL(req.url);
     const dataset = searchParams.get("dataset");
     const filename = searchParams.get("filename");
@@ -157,18 +108,13 @@ export async function DELETE(req: NextRequest) {
     const blobClient = containerClient.getBlockBlobClient(`${dataset}/${filename}`);
     await blobClient.deleteIfExists();
 
-    await client.connect();
-    const db = client.db();
-    const mediaCollection = db.collection<MediaDoc>("media");
-    await mediaCollection.deleteOne({ dataset, name: filename });
+    const result = await prisma.mediaDoc.deleteMany({
+      where: { datasetId: dataset, name: filename }
+    });
 
-    return NextResponse.json({ message: "File and metadata deleted" });
+    return NextResponse.json({ message: "File and metadata deleted", deletedCount: result.count });
   } catch (e: unknown) {
     console.error("Error deleting file:", e);
     return NextResponse.json(toJsonErr(e), { status: 500 });
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }

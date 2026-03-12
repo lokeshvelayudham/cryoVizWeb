@@ -1,7 +1,8 @@
 import type { NextAuthOptions } from "next-auth";
-import clientPromise from "@/lib/mongodb";
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import prisma from "@/lib/prisma";
 import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 // Extend the built-in session types
 declare module "next-auth" {
@@ -28,8 +29,36 @@ declare module "next-auth/jwt" {
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Custom OTP authentication - no NextAuth providers needed
-    // We handle authentication through /api/auth/request-otp and /api/auth/verify-otp
+    CredentialsProvider({
+      name: "OTP",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        otp: { label: "OTP", type: "text" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.otp) return null;
+
+        const match = await prisma.otp.findFirst({
+          where: { email: credentials.email, otp: credentials.otp }
+        });
+
+        if (!match) return null;
+
+        const user = await prisma.user.findUnique({ where: { email: credentials.email } });
+        
+        if (!user) return null;
+
+        // Clean up OTP after successful use
+        await prisma.otp.deleteMany({ where: { email: credentials.email } });
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          accessLevel: user.accessLevel
+        };
+      }
+    })
   ],
   session: {
     strategy: "jwt",
@@ -40,8 +69,8 @@ export const authOptions: NextAuthOptions = {
     secret: process.env.NEXTAUTH_SECRET!,
     maxAge: 7 * 24 * 60 * 60, // 7 days to match session maxAge
   },
-  
-  adapter: MongoDBAdapter(clientPromise),
+
+  adapter: PrismaAdapter(prisma),
   pages: {
     signIn: "/auth/login",
   },
@@ -51,17 +80,17 @@ export const authOptions: NextAuthOptions = {
       if (user && 'accessLevel' in user) {
         token.accessLevel = user.accessLevel as string;
       }
-      
+
       // Ensure token has required fields for persistence
       if (!token.sub && user?.id) {
         token.sub = user.id;
       }
-      
+
       // Add timestamp for debugging
       if (process.env.NODE_ENV === "development") {
         token.lastUpdated = Date.now();
       }
-      
+
       return token;
     },
     async session({ session, token }) {
@@ -74,11 +103,6 @@ export const authOptions: NextAuthOptions = {
         }
       }
       return session;
-    },
-    async redirect() {
-      // For now, always return a safe default to prevent build errors
-      // TODO: Re-enable redirect logic once build issues are resolved
-      return "/";
     },
   },
   secret: process.env.NEXTAUTH_SECRET,

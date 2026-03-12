@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import prisma from "@/lib/prisma";
 import nodemailer from "nodemailer";
 import { randomInt } from "crypto";
 
@@ -11,11 +11,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const client = await clientPromise;
-    const db = client.db();
-
     // Check if user exists
-    const user = await db.collection("users").findOne({ email });
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -24,11 +21,12 @@ export async function POST(req: Request) {
     const otp = randomInt(100000, 999999).toString();
     
     // Store OTP in database
-    await db.collection("otps").insertOne({ 
-      email, 
-      otp, 
-      createdAt: new Date(),
-      expires: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    await prisma.otp.create({ 
+      data: {
+        email, 
+        otp, 
+        expires: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+      }
     });
 
     console.log("[OTP] Generated for:", email);

@@ -14,10 +14,10 @@ export type Annotation = {
   user: string;
   datasetId: string;
   status: string;
-  studyName?: string; // New field for study organization
+  groupName?: string; // New field for group organization
 };
 
-export type Study = {
+export type Group = {
   _id: string;
   name: string;
   datasetId: string;
@@ -32,9 +32,9 @@ export default function useAnnotations(
   datasetId: string
 ) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [studies, setStudies] = useState<Study[]>([]);
-  const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
-  const [viewMode, setViewMode] = useState<"studies" | "annotations">("studies");
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [viewMode, setViewMode] = useState<"groups" | "annotations">("groups");
   const [isAnnotating, setIsAnnotating] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
@@ -75,7 +75,7 @@ export default function useAnnotations(
         user: string;
         datasetId: string;
         status: string;
-        studyName?: string;
+        groupName?: string;
       }) => ({
         _id: item._id?.toString() || "",
         id: item.id,
@@ -89,7 +89,7 @@ export default function useAnnotations(
         user: item.user || userEmail,
         datasetId: item.datasetId || datasetId,
         status: item.status || "active",
-        studyName: item.studyName || "Default Study",
+        groupName: item.groupName || "Default Group",
       }));
       setAnnotations(fetchedAnnotations);
       console.log("Annotations fetched from MongoDB:", fetchedAnnotations.map(a => ({ _id: a._id, id: a.id, user: a.user, datasetId })));
@@ -99,67 +99,67 @@ export default function useAnnotations(
     }
   }, [userEmail, setErrorMessage, datasetId]);
 
-  const fetchStudies = useCallback(async () => {
+  const fetchGroups = useCallback(async () => {
     if (!userEmail || !datasetId) return;
     
     try {
-      const response = await fetch(`/api/studies?datasetId=${encodeURIComponent(datasetId)}`);
+      const response = await fetch(`/api/groups?datasetId=${encodeURIComponent(datasetId)}`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch studies: ${response.statusText}`);
+        throw new Error(`Failed to fetch groups: ${response.statusText}`);
       }
       
-      const studiesData = await response.json();
+      const groupsData = await response.json();
       
-      // Ensure Default Study exists in the fetched studies
-      let studiesList = studiesData;
-      const hasDefaultStudy = studiesData.some((study: Study) => study.name === "Default Study");
+      // Ensure Default Group exists in the fetched groups
+      let groupsList = groupsData;
+      const hasDefaultGroup = groupsData.some((group: Group) => group.name === "Default Group");
       
-      if (!hasDefaultStudy) {
-        // Create Default Study if it doesn't exist
-        const defaultStudy: Study = {
-          _id: `study_Default Study_${datasetId}`,
-          name: "Default Study",
+      if (!hasDefaultGroup) {
+        // Create Default Group if it doesn't exist
+        const defaultGroup: Group = {
+          _id: `group_Default Group_${datasetId}`,
+          name: "Default Group",
           datasetId,
           user: userEmail,
           createdAt: new Date(),
-          annotationCount: annotations.filter(a => !a.studyName || a.studyName === "Default Study").length
+          annotationCount: annotations.filter(a => !a.groupName || a.groupName === "Default Group").length
         };
-        studiesList = [defaultStudy, ...studiesData];
+        groupsList = [defaultGroup, ...groupsData];
       }
       
-      setStudies(studiesList);
-      console.log("Studies fetched from API with Default Study:", studiesList);
+      setGroups(groupsList);
+      console.log("Groups fetched from API with Default Group:", groupsList);
     } catch (error) {
-      console.error("Error fetching studies from API:", error);
-      // Fallback: create studies from annotations if API fails
-      const studyMap = new Map<string, { name: string; count: number; firstAnnotation: Annotation }>();
+      console.error("Error fetching groups from API:", error);
+      // Fallback: create groups from annotations if API fails
+      const groupMap = new Map<string, { name: string; count: number; firstAnnotation: Annotation }>();
       
       annotations.forEach(annotation => {
-        const studyName = annotation.studyName || "Default Study";
-        if (studyMap.has(studyName)) {
-          studyMap.get(studyName)!.count++;
+        const groupName = annotation.groupName || "Default Group";
+        if (groupMap.has(groupName)) {
+          groupMap.get(groupName)!.count++;
         } else {
-          studyMap.set(studyName, {
-            name: studyName,
+          groupMap.set(groupName, {
+            name: groupName,
             count: 1,
             firstAnnotation: annotation
           });
         }
       });
 
-      // Ensure Default Study exists if there are any annotations
-      if (annotations.length > 0 && !studyMap.has("Default Study")) {
-        studyMap.set("Default Study", {
-          name: "Default Study",
-          count: annotations.filter(a => !a.studyName || a.studyName === "Default Study").length,
+      // Ensure Default Group exists if there are any annotations
+      if (annotations.length > 0 && !groupMap.has("Default Group")) {
+        groupMap.set("Default Group", {
+          name: "Default Group",
+          count: annotations.filter(a => !a.groupName || a.groupName === "Default Group").length,
           firstAnnotation: annotations[0]
         });
       }
 
-      // If no studies exist at all, create a Default Study
-      if (studyMap.size === 0) {
-        studyMap.set("Default Study", {
-          name: "Default Study",
+      // If no groups exist at all, create a Default Group
+      if (groupMap.size === 0) {
+        groupMap.set("Default Group", {
+          name: "Default Group",
           count: 0,
           firstAnnotation: {
             _id: "",
@@ -174,13 +174,13 @@ export default function useAnnotations(
             user: userEmail,
             datasetId,
             status: "active",
-            studyName: "Default Study"
+            groupName: "Default Group"
           }
         });
       }
 
-      const studiesList: Study[] = Array.from(studyMap.entries()).map(([name, data]) => ({
-        _id: `study_${name}_${datasetId}`,
+      const groupsList: Group[] = Array.from(groupMap.entries()).map(([name, data]) => ({
+        _id: `group_${name}_${datasetId}`,
         name: data.name,
         datasetId,
         user: userEmail,
@@ -188,74 +188,74 @@ export default function useAnnotations(
         annotationCount: data.count
       }));
 
-      setStudies(studiesList);
-      console.log("Studies created from fallback:", studiesList);
+      setGroups(groupsList);
+      console.log("Groups created from fallback:", groupsList);
     }
   }, [userEmail, datasetId, annotations]);
 
-  const createStudy = useCallback(async (studyName: string) => {
+  const createGroup = useCallback(async (groupName: string) => {
     if (!userEmail || !datasetId) return;
     
     try {
-      const response = await fetch("/api/studies", {
+      const response = await fetch("/api/groups", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: studyName,
+          name: groupName,
           datasetId,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create study");
+        throw new Error(errorData.error || "Failed to create group");
       }
 
-      const newStudy = await response.json();
-      console.log("Study created via API:", newStudy);
+      const newGroup = await response.json();
+      console.log("Group created via API:", newGroup);
       
-      setStudies(prev => [...prev, newStudy]);
-      setSelectedStudy(newStudy);
+      setGroups(prev => [...prev, newGroup]);
+      setSelectedGroup(newGroup);
       setViewMode("annotations");
     } catch (error) {
-      console.error("Error creating study via API:", error);
-      // Fallback: create study locally if API fails
-      const newStudy: Study = {
-        _id: `study_${studyName}_${datasetId}`,
-        name: studyName,
+      console.error("Error creating group via API:", error);
+      // Fallback: create group locally if API fails
+      const newGroup: Group = {
+        _id: `group_${groupName}_${datasetId}`,
+        name: groupName,
         datasetId,
         user: userEmail,
         createdAt: new Date(),
         annotationCount: 0
       };
       
-      setStudies(prev => [...prev, newStudy]);
-      setSelectedStudy(newStudy);
+      setGroups(prev => [...prev, newGroup]);
+      setSelectedGroup(newGroup);
       setViewMode("annotations");
     }
   }, [userEmail, datasetId]);
 
-  const switchToStudy = useCallback((study: Study) => {
-    setSelectedStudy(study);
+  const switchToGroup = useCallback((group: Group) => {
+    setSelectedGroup(group);
     setViewMode("annotations");
   }, []);
 
-  const switchToStudiesList = useCallback(() => {
-    setSelectedStudy(null);
-    setViewMode("studies");
+  const switchToGroupsList = useCallback(() => {
+    setSelectedGroup(null);
+    setViewMode("groups");
   }, []);
 
-  const getAnnotationsForStudy = useCallback((studyName: string) => {
-    return annotations.filter(ann => ann.studyName === studyName);
+  const getAnnotationsForGroup = useCallback((groupName: string) => {
+    return annotations.filter(ann => ann.groupName === groupName);
   }, [annotations]);
 
-  // Get current study annotations - this will be used for display
-  const currentStudyAnnotations = useMemo(() => {
-    if (!selectedStudy) return annotations; // Show all if no study selected
-    return annotations.filter(ann => ann.studyName === selectedStudy.name);
-  }, [annotations, selectedStudy]);
+  // Get current group annotations - this will be used for display
+  const currentGroupAnnotations = useMemo(() => {
+    if (!selectedGroup) return annotations; // Show all if no group selected
+    return annotations.filter(ann => ann.groupName === selectedGroup.name);
+  }, [annotations, selectedGroup]);
 
   const saveAnnotationToMongoDB = useCallback(async (annotation: Annotation, updateOnlyPosition: boolean = false, retryCount: number = 0) => {
     if (!userEmail) {
@@ -269,7 +269,7 @@ export default function useAnnotations(
         ...annotation,
         user: userEmail,
         datasetId: annotation.datasetId || datasetId,
-        studyName: annotation.studyName || "Default Study",
+        groupName: annotation.groupName || "Default Group",
         datetime: Date.now(),
       };
 
@@ -297,8 +297,8 @@ export default function useAnnotations(
 
       setErrorMessage(null);
       
-      // Refresh studies to update annotation counts
-      setTimeout(() => fetchStudies(), 100);
+      // Refresh groups to update annotation counts
+      setTimeout(() => fetchGroups(), 100);
       
     } catch (error) {
       console.error("Error saving annotation to MongoDB:", error);
@@ -309,7 +309,7 @@ export default function useAnnotations(
         setErrorMessage(`Failed to save annotation: ${(error as Error).message}`);
       }
     }
-  }, [userEmail, setErrorMessage, datasetId, fetchStudies]);
+  }, [userEmail, setErrorMessage, datasetId, fetchGroups]);
 
   const deleteAnnotationFromMongoDB = useCallback(async (annotationId: string) => {
     if (!userEmail) {
@@ -341,13 +341,13 @@ export default function useAnnotations(
       console.log("Annotation deleted from MongoDB:", { _id: annotation._id, id: annotation.id, datasetId });
       setErrorMessage(null);
       
-      // Refresh studies to update annotation counts
-      setTimeout(() => fetchStudies(), 100);
+      // Refresh groups to update annotation counts
+      setTimeout(() => fetchGroups(), 100);
     } catch (error) {
       console.error("Error deleting annotation from MongoDB:", error);
       setErrorMessage(`Failed to delete annotation: ${(error as Error).message}`);
     }
-  }, [userEmail, setErrorMessage, annotations, datasetId, fetchStudies]);
+  }, [userEmail, setErrorMessage, annotations, datasetId, fetchGroups]);
 
   const handleEditAnnotation = useCallback((id: string, text: string) => {
     setEditingAnnotationId(id);
@@ -370,17 +370,17 @@ export default function useAnnotations(
         }
       }
       
-      // Refresh studies to update annotation counts
-      setTimeout(() => fetchStudies(), 100);
+      // Refresh groups to update annotation counts
+      setTimeout(() => fetchGroups(), 100);
     }
     setEditingAnnotationId(null);
     setEditingText("");
-  }, [annotations, editingText, saveAnnotationToMongoDB, deleteAnnotationFromMongoDB, datasetId, fetchStudies]);
+  }, [annotations, editingText, saveAnnotationToMongoDB, deleteAnnotationFromMongoDB, datasetId, fetchGroups]);
 
-  // Fetch studies and annotations when component mounts
+  // Fetch groups and annotations when component mounts
   useEffect(() => {
     if (userEmail && datasetId) {
-      fetchStudies();
+      fetchGroups();
       fetchAnnotations();
     }
     // Only run on mount or when user/dataset changes, ignore function recreations
@@ -403,15 +403,15 @@ export default function useAnnotations(
     deleteAnnotationFromMongoDB,
     handleEditAnnotation,
     handleSaveEdit,
-    studies,
-    selectedStudy,
+    groups,
+    selectedGroup,
     viewMode,
     setViewMode,
-    switchToStudy,
-    switchToStudiesList,
-    getAnnotationsForStudy,
-    createStudy,
-    currentStudyAnnotations,
-    fetchStudies,
+    switchToGroup,
+    switchToGroupsList,
+    getAnnotationsForGroup,
+    createGroup,
+    currentGroupAnnotations,
+    fetchGroups,
   };
 }

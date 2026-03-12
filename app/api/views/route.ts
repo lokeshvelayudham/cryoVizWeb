@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
     const url = new URL(req.url);
     const datasetId = url.searchParams.get("datasetId");
 
@@ -13,8 +10,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "datasetId is required" }, { status: 400 });
     }
 
-    const views = await db.collection("views").find({ datasetId }).toArray();
-    return NextResponse.json({ views }, { status: 200 });
+    const views = await prisma.view.findMany({ where: { datasetId } });
+    
+    // Restore raw map to frontend expectations
+    const formattedViews = views.map(v => ({
+      ...v,
+      _id: v.id,
+      coords: v.coords ? JSON.parse(v.coords) : null,
+      zoom: v.zoom ? JSON.parse(v.zoom) : null,
+      pan: v.pan ? JSON.parse(v.pan) : null,
+      loadStats: v.loadStats ? JSON.parse(v.loadStats) : []
+    }));
+
+    return NextResponse.json({ views: formattedViews }, { status: 200 });
   } catch (error) {
     console.error("Error fetching views:", error);
     return NextResponse.json({ error: "Failed to fetch views" }, { status: 500 });
@@ -23,28 +31,44 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
     const body = await req.json();
 
     if (!body.name || !body.coords || !body.zoom || !body.pan || !body.creator || !body.datasetId) {
       return NextResponse.json({ error: "name, coords, zoom, pan, creator, and datasetId are required" }, { status: 400 });
     }
 
-    const view = {
-      name: body.name,
+    let userEmail = body.creator;
+    const userExists = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!userExists) {
+      return NextResponse.json({ error: "User does not exist" }, { status: 400 });
+    }
+
+    const view = await prisma.view.create({
+      data: {
+        name: body.name,
+        coords: JSON.stringify(body.coords),
+        zoom: JSON.stringify(body.zoom),
+        pan: JSON.stringify(body.pan),
+        creatorEmail: userEmail,
+        datasetId: body.datasetId,
+        loadCount: 0,
+        loadStats: "[]",
+      }
+    });
+
+    // Reconstruct for return
+    const reconstructedView = {
+      ...view,
+      _id: view.id,
       coords: body.coords,
       zoom: body.zoom,
       pan: body.pan,
-      creator: body.creator,
-      datasetId: body.datasetId,
-      createdAt: new Date(),
-      loadCount: 0,
-      loadStats: [],
+      creator: userEmail,
+      loadStats: []
     };
-    const result = await db.collection("views").insertOne(view);
+
     return NextResponse.json(
-      { message: "View saved successfully", view: { ...view, _id: result.insertedId } },
+      { message: "View saved successfully", view: reconstructedView },
       { status: 200 }
     );
   } catch (error) {
@@ -55,8 +79,6 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
     const body = await req.json();
     const { id, name, datasetId } = body;
 
@@ -64,14 +86,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "id, name, and datasetId are required" }, { status: 400 });
     }
 
-    const result = await db.collection("views").updateOne(
-      { _id: new ObjectId(id), datasetId },
-      { $set: { name } }
-    );
+    const existing = await prisma.view.findFirst({
+      where: { id: id, datasetId }
+    });
 
-    if (result.matchedCount === 0) {
+    if (!existing) {
       return NextResponse.json({ error: "View not found" }, { status: 404 });
     }
+
+    const result = await prisma.view.update({
+      where: { id: id },
+      data: { name }
+    });
 
     return NextResponse.json(
       { message: "View name updated successfully", view: { id, name } },
@@ -85,8 +111,6 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     const datasetId = url.searchParams.get("datasetId");
@@ -95,13 +119,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "id and datasetId are required" }, { status: 400 });
     }
 
-    const result = await db.collection("views").deleteOne({
-      _id: new ObjectId(id),
-      datasetId,
+    const existing = await prisma.view.findFirst({
+      where: { id: id, datasetId }
     });
-    if (result.deletedCount === 0) {
+
+    if (!existing) {
       return NextResponse.json({ error: "View not found" }, { status: 404 });
     }
+
+    await prisma.view.delete({
+      where: { id }
+    });
 
     return NextResponse.json({ message: "View deleted successfully" }, { status: 200 });
   } catch (error) {

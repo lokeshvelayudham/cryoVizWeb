@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Edit, Eye, List, Pen, FolderOpen } from "lucide-react";
-import { Study } from "./useAnnotations";
+import { Group } from "./useAnnotations";
 
 interface AnnotationPanelProps {
   isAnnotating: boolean;
@@ -10,10 +10,10 @@ interface AnnotationPanelProps {
   onOpenModal: () => void;
   onCloseModal: () => void; // Add close modal function
   showModal: boolean; // Add this to sync button state
-  studies?: Study[];
-  selectedStudy?: Study | null;
-  viewMode?: "studies" | "annotations";
-  onSwitchToStudy?: (study: Study) => void;
+  groups?: Group[];
+  selectedGroup?: Group | null;
+  viewMode?: "groups" | "annotations";
+  onSwitchToGroup?: (group: Group) => void;
 }
 
 const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
@@ -24,10 +24,10 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   onOpenModal,
   onCloseModal,
   showModal,
-  studies = [],
-  selectedStudy = null,
-  viewMode = "studies",
-  onSwitchToStudy,
+  groups = [],
+  selectedGroup = null,
+  viewMode = "groups",
+  onSwitchToGroup,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,11 +49,11 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Ensure studies is always an array
-  const safeStudies = Array.isArray(studies) ? studies : [];
+  // Ensure groups is always an array
+  const safeGroups = Array.isArray(groups) ? groups : [];
 
   // Safe callback functions
-  const safeSwitchToStudy = onSwitchToStudy || (() => {});
+  const safeSwitchToGroup = onSwitchToGroup || (() => {});
 
   return (
     <div style={{ position: "absolute", bottom: 110, left: 10, zIndex: 10 }} ref={menuRef}>
@@ -65,7 +65,7 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
         <Pen className="w-4 h-4" />
       </button>
 
-      {/* Current Study Indicator - Moved below the button */}
+      {/* Current Group Indicator - Moved below the button */}
       {showMenu && (
         <div
           className="bg-white dark:bg-gray-800 shadow-lg rounded-md py-2 w-48 z-[1000]"
@@ -76,12 +76,12 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
             fontSize: "0.85rem",
           }}
         >
-          {/* Current Study Display */}
-          {selectedStudy && viewMode === "annotations" && (
+          {/* Current Group Display */}
+          {selectedGroup && viewMode === "annotations" && (
             <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Current Study:</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Current Group:</div>
               <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                {selectedStudy.name}
+                {selectedGroup.name}
               </div>
             </div>
           )}
@@ -139,26 +139,26 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
             {showModal ? "Close Annotations" : "View All Annotations"}
           </button>
 
-          {/* Quick Study Switcher */}
-          {safeStudies.length > 0 && (
+          {/* Quick Group Switcher */}
+          {safeGroups.length > 0 && (
             <>
               <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 mt-2">
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick Study Switch:</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick Group Switch:</div>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {safeStudies.map((study) => (
+                  {safeGroups.map((group) => (
                     <button
-                      key={study._id}
+                      key={group._id}
                       onClick={() => {
-                        safeSwitchToStudy(study);
+                        safeSwitchToGroup(group);
                         setShowMenu(false);
                       }}
                       className={`flex items-center w-full px-2 py-1 text-xs rounded hover:bg-blue-500 hover:text-white transition-colors ${
-                        selectedStudy?._id === study._id ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-200"
+                        selectedGroup?._id === group._id ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-200"
                       }`}
                     >
                       <FolderOpen size={12} className="mr-1" />
-                      <span className="truncate">{study.name}</span>
-                      <span className="ml-auto text-xs opacity-70">({study.annotationCount})</span>
+                      <span className="truncate">{group.name}</span>
+                      <span className="ml-auto text-xs opacity-70">({group.annotationCount})</span>
                     </button>
                   ))}
                 </div>

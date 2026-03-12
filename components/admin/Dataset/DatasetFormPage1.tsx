@@ -9,14 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Institution } from "@/lib/models";
+
+interface Study {
+  _id: string;
+  id: string;
+  name: string;
+  poNo: string | null;
+  status: string;
+  institution: { id: string; name: string; abbr: string };
+}
 
 interface DatasetFormPage1Props {
-  institutions: Institution[];
+  studies: Study[];
   onSubmit: (data: unknown) => void;
 }
 
-export default function DatasetFormPage1({ institutions, onSubmit }: DatasetFormPage1Props) {
+export default function DatasetFormPage1({ studies, onSubmit }: DatasetFormPage1Props) {
   const { control, handleSubmit } = useFormContext();
 
   return (
@@ -46,20 +54,20 @@ export default function DatasetFormPage1({ institutions, onSubmit }: DatasetForm
           />
         </div>
         <div>
-          <label className="text-sm font-medium">Institution</label>
+          <label className="text-sm font-medium">Study</label>
           <Controller
             control={control}
-            name="institutionId"
+            name="studyId"
             render={({ field, fieldState }) => (
               <>
                 <Select {...field} onValueChange={field.onChange} value={field.value || ""}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select institution" />
+                    <SelectValue placeholder="Select study" />
                   </SelectTrigger>
                   <SelectContent>
-                    {institutions.map((inst) => (
-                      <SelectItem key={inst._id?.toString() || ""} value={inst._id?.toString() || ""}>
-                        {inst.name}
+                    {studies.map((study) => (
+                      <SelectItem key={study._id} value={study._id}>
+                        {study.name} ({study.institution?.name || "N/A"})
                       </SelectItem>
                     ))}
                   </SelectContent>

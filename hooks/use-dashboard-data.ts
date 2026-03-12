@@ -77,7 +77,12 @@ export function useDashboardData() {
       const response = await fetch('/api/admin/dashboard');
       
       if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
+        let errMsg = 'Failed to fetch dashboard data';
+        try {
+          const result = await response.json();
+          if (result.error) errMsg = result.error;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
       
       const result = await response.json();

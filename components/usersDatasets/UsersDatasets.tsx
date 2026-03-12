@@ -32,7 +32,7 @@ type AdminDataResult = {
 type MappingView = {
   mappingId: string;
   parent: Dataset | null;
-  children: { dataset: Dataset | null; alias?: string }[];
+  children: { dataset: Dataset | null; alias?: string | null }[];
 };
 
 export default function UsersDatasets() {

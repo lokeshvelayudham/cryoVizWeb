@@ -1,5 +1,4 @@
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
 export interface NotificationData {
   userId: string;
@@ -11,7 +10,7 @@ export interface NotificationData {
     datasetId?: string;
     uploadId?: string;
     action?: string;
-  };
+  } | null;
 }
 
 /**
@@ -20,25 +19,26 @@ export interface NotificationData {
  */
 export async function createNotification(notificationData: NotificationData) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-
     // Verify user exists
-    const user = await db.collection("users").findOne({ _id: new ObjectId(notificationData.userId) });
+    const user = await prisma.user.findUnique({ where: { id: notificationData.userId } });
     if (!user) {
       throw new Error("User not found");
     }
 
     // Create notification
-    const notification = {
-      ...notificationData,
-      timestamp: new Date(),
-      read: false,
-      priority: notificationData.priority || 'medium'
-    };
+    const result = await prisma.notification.create({
+      data: {
+        userId: notificationData.userId,
+        type: notificationData.type,
+        title: notificationData.title,
+        message: notificationData.message,
+        priority: notificationData.priority || 'medium',
+        read: false,
+        metadata: notificationData.metadata ? JSON.stringify(notificationData.metadata) : null,
+      }
+    });
 
-    const result = await db.collection("notifications").insertOne(notification);
-    return result.insertedId.toString();
+    return result.id;
   } catch (error) {
     console.error("Failed to create notification:", error);
     throw error;
@@ -50,33 +50,29 @@ export async function createNotification(notificationData: NotificationData) {
  */
 export async function createNotificationsForUsers(userIds: string[], notificationData: Omit<NotificationData, 'userId'>) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-
     // Verify users exist
-    const users = await db.collection("users").find({
-      _id: { $in: userIds.map(id => new ObjectId(id)) }
-    }).toArray();
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } }
+    });
 
     if (users.length === 0) {
       throw new Error("No valid users found");
     }
 
     // Create notifications for each user
-    const notifications = users.map(user => ({
-      ...notificationData,
-      userId: user._id.toString(),
-      timestamp: new Date(),
-      read: false,
-      priority: notificationData.priority || 'medium'
-    }));
+    const result = await prisma.notification.createMany({
+      data: users.map(user => ({
+        userId: user.id,
+        type: notificationData.type,
+        title: notificationData.title,
+        message: notificationData.message,
+        priority: notificationData.priority || 'medium',
+        read: false,
+        metadata: notificationData.metadata ? JSON.stringify(notificationData.metadata) : null,
+      }))
+    });
 
-    if (notifications.length > 0) {
-      const result = await db.collection("notifications").insertMany(notifications);
-      return result.insertedIds;
-    }
-
-    return {};
+    return { count: result.count };
   } catch (error) {
     console.error("Failed to create notifications for users:", error);
     throw error;

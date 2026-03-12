@@ -1,76 +1,87 @@
-import { ObjectId } from "mongodb";
-import clientPromise from "./mongodb";
+import prisma from "./prisma";
 import { getOrSetCache, invalidateCache } from "./redis";
 
+// ---------------------------------------------------------------------------
+// TYPES
+// We preserve the `_id` and `ObjectId` type shapes to prevent the frontend
+// from breaking, mapping them to Prisma string IDs.
+// ---------------------------------------------------------------------------
+
 export interface Institution {
-  _id?: ObjectId;
+  _id?: string; // Was ObjectId
+  id?: string;
   name: string;
   abbr: string;
-  type: "Industry" | "Government" | "Academic" | "Others";
+  type: "Industry" | "Government" | "Academic" | "Others" | string;
   industry: string;
   address: string;
   phone: string;
   email: string;
   website: string;
-  status: "Active" | "Inactive";
+  status: "Active" | "Inactive" | string;
   createdAt: Date;
 }
 
 export interface User {
-  _id?: ObjectId;
-  name: string;
-  email: string;
-  accessLevel: "admin" | "user";
-  institutionId: ObjectId;
+  _id?: string; // Was ObjectId
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  accessLevel: "admin" | "user" | string;
+  institutionId?: string | null;
   logins: number;
-  lastLogin?: Date;
+  lastLogin?: Date | null;
   assignedDatasets: string[];
 }
 
 export interface Dataset {
-  _id?: ObjectId;
-  datasetId?: string; // UUID from Python processing
+  _id?: string; // Was ObjectId
+  id?: string;
+  datasetId?: string | null; // UUID from Python processing
   name: string;
-  description?: string;
-  institutionId: string;
-  brightfieldBlobUrl?: string;
-  fluorescentBlobUrl?: string;
-  spacing?: number;
+  description?: string | null;
+  institutionId?: string | null;
+  studyId?: string | null;
+  brightfieldBlobUrl?: string | null;
+  fluorescentBlobUrl?: string | null;
+  spacing?: number | null;
   assignedUsers?: string[];
   createdAt: Date;
-  brightfieldNumZ?: number;
-  brightfieldNumY?: number;
-  brightfieldNumX?: number;
-  fluorescentNumZ?: number;
-  fluorescentNumY?: number;
-  fluorescentNumX?: number;
+  brightfieldNumZ?: number | null;
+  brightfieldNumY?: number | null;
+  brightfieldNumX?: number | null;
+  fluorescentNumZ?: number | null;
+  fluorescentNumY?: number | null;
+  fluorescentNumX?: number | null;
 }
 
 export interface DatasetChildRef {
-  datasetId: string;           // child dataset _id as string
-  alias?: string;              // user-provided child name
-  order?: number;              // for manual ordering in UI
+  datasetId: string;           
+  alias?: string | null;              
+  order?: number | null;              
 }
 
 export interface DatasetMapping {
-  _id?: ObjectId;
-  parentId: string;            // parent dataset _id as string
-  children: DatasetChildRef[]; // children list
+  _id?: string;
+  id?: string;
+  parentId: string;            
+  children: DatasetChildRef[]; 
   createdAt: Date;
   updatedAt?: Date;
 }
 
+// ---------------------------------------------------------------------------
+// DATA ACCESS FUNCTIONS
+// ---------------------------------------------------------------------------
+
 /**
  * Retrieves all institutions from the database.
- * @returns A promise resolving to an array of Institution objects.
- * @throws Error if the database query fails.
  */
 export async function getInstitutions(): Promise<Institution[]> {
   try {
     return await getOrSetCache('institutions_all', async () => {
-      const client = await clientPromise;
-      const db = client.db();
-      return await db.collection<Institution>("institutions").find().toArray();
+      const institutions = await prisma.institution.findMany();
+      return institutions.map(inst => ({ ...inst, _id: inst.id }));
     });
   } catch (error) {
     throw new Error(`Failed to fetch institutions: ${error}`);
@@ -79,15 +90,18 @@ export async function getInstitutions(): Promise<Institution[]> {
 
 /**
  * Retrieves all users from the database.
- * @returns A promise resolving to an array of User objects.
- * @throws Error if the database query fails.
  */
 export async function getUsers(): Promise<User[]> {
   try {
     return await getOrSetCache('users_all', async () => {
-      const client = await clientPromise;
-      const db = client.db();
-      return await db.collection<User>("users").find().toArray();
+      const users = await prisma.user.findMany({
+        include: { assignedDatasets: true }
+      });
+      return users.map(user => ({
+        ...user,
+        _id: user.id,
+        assignedDatasets: user.assignedDatasets.map(d => d.id)
+      }));
     });
   } catch (error) {
     throw new Error(`Failed to fetch users: ${error}`);
@@ -96,15 +110,18 @@ export async function getUsers(): Promise<User[]> {
 
 /**
  * Retrieves all datasets from the database.
- * @returns A promise resolving to an array of Dataset objects.
- * @throws Error if the database query fails.
  */
 export async function getDatasets(): Promise<Dataset[]> {
   try {
     return await getOrSetCache('datasets_all', async () => {
-      const client = await clientPromise;
-      const db = client.db();
-      return await db.collection<Dataset>("datasets").find().toArray();
+      const datasets = await prisma.dataset.findMany({
+        include: { assignedUsers: true }
+      });
+      return datasets.map(dataset => ({
+        ...dataset,
+        _id: dataset.id,
+        assignedUsers: dataset.assignedUsers.map(u => u.id)
+      }));
     });
   } catch (error) {
     throw new Error(`Failed to fetch datasets: ${error}`);
@@ -113,43 +130,35 @@ export async function getDatasets(): Promise<Dataset[]> {
 
 /**
  * Creates a new institution in the database.
- * @param institution - The institution data to insert.
- * @returns A promise resolving to the MongoDB insert result.
- * @throws Error if the database operation fails.
  */
-export async function createInstitution(institution: Omit<Institution, "_id" | "createdAt">) {
+export async function createInstitution(institution: Omit<Institution, "_id" | "id" | "createdAt">) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const data = { ...institution, createdAt: new Date() };
-    const result = await db.collection<Institution>("institutions").insertOne(data);
+    const result = await prisma.institution.create({
+      data: institution
+    });
     await invalidateCache('institutions_all');
-    return result;
+    return { insertedId: result.id };
   } catch (error) {
     throw new Error(`Failed to create institution: ${error}`);
   }
 }
 
 /**
- * Updates an existing institution in the database.
- * @param institution - The institution data to update, including the _id.
- * @returns A promise resolving to the MongoDB update result.
- * @throws Error if the database operation fails or _id is missing.
+ * Updates an existing institution.
  */
 export async function updateInstitution(institution: Institution) {
   try {
-    if (!institution._id) {
-      throw new Error("Institution _id is required for update");
-    }
-    const client = await clientPromise;
-    const db = client.db();
-    const { _id, ...updateData } = institution;
-    const result = await db.collection<Institution>("institutions").updateOne(
-      { _id: new ObjectId(_id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
-    );
+    const id = institution._id || institution.id;
+    if (!id) throw new Error("Institution _id is required for update");
+    
+    const { _id, id: _droppedId, createdAt, ...updateData } = institution;
+    
+    await prisma.institution.update({
+      where: { id },
+      data: updateData
+    });
     await invalidateCache('institutions_all');
-    return result;
+    return { modifiedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to update institution: ${error}`);
   }
@@ -157,22 +166,26 @@ export async function updateInstitution(institution: Institution) {
 
 /**
  * Creates a new user in the database.
- * @param user - The user data to insert.
- * @returns A promise resolving to the MongoDB insert result.
- * @throws Error if the database operation fails or email exists.
  */
-export async function createUser(user: Omit<User, "_id" | "logins" | "lastLogin" | "assignedDatasets">) {
+export async function createUser(user: Omit<User, "_id" | "id" | "logins" | "lastLogin" | "assignedDatasets">) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const existingUser = await db.collection<User>("users").findOne({ email: user.email });
-    if (existingUser) {
-      throw new Error("Email already exists");
+    if (user.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email: user.email } });
+      if (existingUser) throw new Error("Email already exists");
     }
-    const data = { ...user, logins: 0, lastLogin: undefined, assignedDatasets: [] };
-    const result = await db.collection<User>("users").insertOne(data);
+
+    const { institutionId, accessLevel, name, email } = user;
+    const result = await prisma.user.create({
+      data: {
+        name,
+        email,
+        accessLevel: accessLevel || "user",
+        institutionId,
+        logins: 0,
+      }
+    });
     await invalidateCache('users_all');
-    return result;
+    return { insertedId: result.id };
   } catch (error) {
     throw new Error(`Failed to create user: ${error}`);
   }
@@ -180,31 +193,27 @@ export async function createUser(user: Omit<User, "_id" | "logins" | "lastLogin"
 
 /**
  * Updates an existing user in the database.
- * @param user - The user data to update, including the _id.
- * @returns A promise resolving to the MongoDB update result.
- * @throws Error if the database operation fails, _id is missing, or email exists for another user.
  */
 export async function updateUser(user: User) {
   try {
-    if (!user._id) {
-      throw new Error("User _id is required for update");
+    const id = user._id || user.id;
+    if (!id) throw new Error("User _id is required for update");
+    
+    if (user.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email: user.email } });
+      if (existingUser && existingUser.id !== id) {
+        throw new Error("Email already exists for another user");
+      }
     }
-    const client = await clientPromise;
-    const db = client.db();
-    const existingUser = await db.collection<User>("users").findOne({
-      email: user.email,
-      _id: { $ne: new ObjectId(user._id) },
+
+    const { _id, id: _droppedId, assignedDatasets, ...updateData } = user;
+    
+    await prisma.user.update({
+      where: { id },
+      data: updateData
     });
-    if (existingUser) {
-      throw new Error("Email already exists for another user");
-    }
-    const { _id, ...updateData } = user;
-    const result = await db.collection<User>("users").updateOne(
-      { _id: new ObjectId(_id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
-    );
     await invalidateCache('users_all');
-    return result;
+    return { modifiedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to update user: ${error}`);
   }
@@ -212,23 +221,18 @@ export async function updateUser(user: User) {
 
 /**
  * Updates the login count and last login timestamp for a user by their ID.
- * @param id - The ID of the user to update.
- * @returns A promise resolving to the MongoDB update result.
- * @throws Error if the database operation fails or ID is invalid.
  */
 export async function updateUserLastLogin(id: string) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection<User>("users").updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $inc: { logins: 1 },
-        $set: { lastLogin: new Date(), updatedAt: new Date() },
+    await prisma.user.update({
+      where: { id },
+      data: {
+        logins: { increment: 1 },
+        lastLogin: new Date()
       }
-    );
+    });
     await invalidateCache('users_all');
-    return result;
+    return { modifiedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to update user login info: ${error}`);
   }
@@ -236,21 +240,19 @@ export async function updateUserLastLogin(id: string) {
 
 /**
  * Updates the assigned datasets for a user by email.
- * @param email - The email of the user to update.
- * @param datasets - The new array of dataset IDs to assign.
- * @returns A promise resolving to the MongoDB update result.
- * @throws Error if the database operation fails.
  */
 export async function updateUserDatasets(email: string, datasets: string[]) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection<User>("users").updateOne(
-      { email },
-      { $set: { assignedDatasets: datasets } }
-    );
+    await prisma.user.update({
+      where: { email },
+      data: {
+        assignedDatasets: {
+          set: datasets.map(id => ({ id }))
+        }
+      }
+    });
     await invalidateCache('users_all');
-    return result;
+    return { modifiedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to update user datasets: ${error}`);
   }
@@ -258,200 +260,181 @@ export async function updateUserDatasets(email: string, datasets: string[]) {
 
 /**
  * Creates a new dataset in the database and updates assigned users.
- * @param dataset - The dataset data to insert.
- * @returns A promise resolving to the MongoDB insert result.
- * @throws Error if the database operation fails.
  */
-export async function createDataset(dataset: Omit<Dataset, "_id" | "createdAt">) {
+export async function createDataset(dataset: Omit<Dataset, "_id" | "id" | "createdAt">) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Sanitize dataset fields to match simplified interface
-    const sanitizedDataset: Omit<Dataset, "_id" | "createdAt"> = {
-      datasetId: dataset.datasetId,
-      name: dataset.name,
-      description: dataset.description,
-      institutionId: dataset.institutionId,
-      brightfieldBlobUrl: dataset.brightfieldBlobUrl,
-      fluorescentBlobUrl: dataset.fluorescentBlobUrl,
-      spacing: typeof dataset.spacing === "number" && !isNaN(dataset.spacing) ? dataset.spacing : undefined,
-      assignedUsers: dataset.assignedUsers || [],
-      brightfieldNumZ: typeof dataset.brightfieldNumZ === "number" && !isNaN(dataset.brightfieldNumZ) ? dataset.brightfieldNumZ : undefined,
-      brightfieldNumY: typeof dataset.brightfieldNumY === "number" && !isNaN(dataset.brightfieldNumY) ? dataset.brightfieldNumY : undefined,
-      brightfieldNumX: typeof dataset.brightfieldNumX === "number" && !isNaN(dataset.brightfieldNumX) ? dataset.brightfieldNumX : undefined,
-      fluorescentNumZ: typeof dataset.fluorescentNumZ === "number" && !isNaN(dataset.fluorescentNumZ) ? dataset.fluorescentNumZ : undefined,
-      fluorescentNumY: typeof dataset.fluorescentNumY === "number" && !isNaN(dataset.fluorescentNumY) ? dataset.fluorescentNumY : undefined,
-      fluorescentNumX: typeof dataset.fluorescentNumX === "number" && !isNaN(dataset.fluorescentNumX) ? dataset.fluorescentNumX : undefined,
-    };
-
-    const data = { ...sanitizedDataset, createdAt: new Date() };
-    const result = await db.collection<Dataset>("datasets").insertOne(data);
-    const datasetId = result.insertedId.toString();
-
-    // Update assigned users with the new dataset ID
-    if (dataset.assignedUsers && dataset.assignedUsers.length > 0) {
-      const updatePromises = dataset.assignedUsers.map((userId) =>
-        db.collection<User>("users").updateOne(
-          { _id: new ObjectId(userId) },
-          { $addToSet: { assignedDatasets: datasetId } }
-        )
-      );
-      await Promise.all(updatePromises);
-      await invalidateCache('users_all');
-    }
+    const { assignedUsers, ...restData } = dataset;
+    
+    const result = await prisma.dataset.create({
+      data: {
+        ...restData,
+        assignedUsers: assignedUsers && assignedUsers.length > 0 
+          ? { connect: assignedUsers.map(id => ({ id })) } 
+          : undefined
+      }
+    });
 
     await invalidateCache('datasets_all');
-    return result;
+    await invalidateCache('users_all');
+    return { insertedId: result.id };
   } catch (error) {
     throw new Error(`Failed to create dataset: ${error}`);
   }
 }
 
 /**
- * Updates an existing dataset in the database.
- * @param dataset - The dataset data to update, including the _id.
- * @returns A promise resolving to the MongoDB update result.
- * @throws Error if the database operation fails or _id is missing.
+ * Updates an existing dataset.
  */
 export async function updateDataset(dataset: Dataset) {
   try {
-    if (!dataset._id) {
-      throw new Error("Dataset _id is required for update");
-    }
-    const client = await clientPromise;
-    const db = client.db();
-    const { _id, ...updateData } = dataset;
-    const result = await db.collection<Dataset>("datasets").updateOne(
-      { _id: new ObjectId(_id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
-    );
+    const id = dataset._id || dataset.id;
+    if (!id) throw new Error("Dataset _id is required for update");
+    
+    const { _id, id: _droppedId, createdAt, assignedUsers, ...updateData } = dataset;
+    
+    await prisma.dataset.update({
+      where: { id },
+      data: updateData
+    });
     await invalidateCache('datasets_all');
-    return result;
+    return { modifiedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to update dataset: ${error}`);
   }
 }
 
 /**
- * Deletes a dataset from the database by its ID.
- * @param id - The ID of the dataset to delete.
- * @returns A promise resolving to the MongoDB delete result.
- * @throws Error if the database operation fails or ID is invalid.
+ * Deletes a dataset by ID.
  */
 export async function deleteDataset(id: string) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection<Dataset>("datasets").deleteOne({
-      _id: new ObjectId(id),
-    });
+    await prisma.dataset.delete({ where: { id } });
     await invalidateCache('datasets_all');
-    return result;
+    return { deletedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to delete dataset: ${error}`);
   }
 }
 
 /**
- * Deletes an institution from the database by its ID.
- * @param id - The ID of the institution to delete.
- * @returns A promise resolving to the MongoDB delete result.
- * @throws Error if the database operation fails or ID is invalid.
+ * Deletes an institution by ID.
  */
 export async function deleteInstitution(id: string) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection<Institution>("institutions").deleteOne({
-      _id: new ObjectId(id),
-    });
+    await prisma.institution.delete({ where: { id } });
     await invalidateCache('institutions_all');
-    return result;
+    return { deletedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to delete institution: ${error}`);
   }
 }
 
 /**
- * Deletes a user from the database by its ID.
- * @param id - The ID of the user to delete.
- * @returns A promise resolving to the MongoDB delete result.
- * @throws Error if the database operation fails or ID is invalid.
+ * Deletes a user by ID.
  */
 export async function deleteUser(id: string) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const result = await db.collection<User>("users").deleteOne({
-      _id: new ObjectId(id),
-    });
+    await prisma.user.delete({ where: { id } });
     await invalidateCache('users_all');
-    return result;
+    return { deletedCount: 1 };
   } catch (error) {
     throw new Error(`Failed to delete user: ${error}`);
   }
 }
 
-
-
+// ---------------------------------------------------------------------------
+// DATASET MAPPINGS
+// ---------------------------------------------------------------------------
 
 export async function getDatasetMappings(): Promise<DatasetMapping[]> {
   return await getOrSetCache('dataset_mappings_all', async () => {
-    const client = await clientPromise;
-    const db = client.db();
-    return await db.collection<DatasetMapping>("dataset_mappings").find().toArray();
+    const mappings = await prisma.datasetMapping.findMany({
+      include: { children: true }
+    });
+    return mappings.map(m => ({
+      ...m,
+      _id: m.id,
+      children: m.children.map(c => ({
+        datasetId: c.datasetId,
+        alias: c.alias,
+        order: c.order
+      }))
+    }));
   });
 }
 
 export async function getDatasetMappingByParent(parentId: string) {
   return await getOrSetCache(`dataset_mappings_${parentId}`, async () => {
-    const client = await clientPromise;
-    const db = client.db();
-    return await db.collection<DatasetMapping>("dataset_mappings").findOne({ parentId });
+    const mapping = await prisma.datasetMapping.findUnique({
+      where: { parentId },
+      include: { children: true }
+    });
+    if (!mapping) return null;
+    return {
+      ...mapping,
+      _id: mapping.id,
+      children: mapping.children.map(c => ({
+        datasetId: c.datasetId,
+        alias: c.alias,
+        order: c.order
+      }))
+    };
   });
 }
 
-export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" | "createdAt">) {
-  const client = await clientPromise;
-  const db = client.db();
-
-  // Prevent duplicate mapping for same parent
-  const existing = await db.collection<DatasetMapping>("dataset_mappings").findOne({ parentId: mapping.parentId });
+export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" | "id" | "createdAt" | "updatedAt">) {
+  const existing = await prisma.datasetMapping.findUnique({ where: { parentId: mapping.parentId } });
   if (existing) throw new Error("Mapping already exists for this parent dataset");
 
-  const doc = { ...mapping, createdAt: new Date(), updatedAt: new Date() };
-  const result = await db.collection<DatasetMapping>("dataset_mappings").insertOne(doc);
+  const result = await prisma.datasetMapping.create({
+    data: {
+      parentId: mapping.parentId,
+      children: {
+        create: mapping.children.map(c => ({
+          datasetId: c.datasetId,
+          alias: c.alias,
+          order: c.order || 0
+        }))
+      }
+    }
+  });
+
   await invalidateCache('dataset_mappings_all');
   await invalidateCache(`dataset_mappings_${mapping.parentId}`);
-  return result;
+  return { insertedId: result.id };
 }
 
 export async function updateDatasetMapping(id: string, patch: Partial<DatasetMapping>) {
-  const client = await clientPromise;
-  const db = client.db();
-  const { ...rest } = patch; // protect
-  const result = await db.collection<DatasetMapping>("dataset_mappings").updateOne(
-    { _id: new ObjectId(id) },
-    { $set: { ...rest, updatedAt: new Date() } }
-  );
+  // If children are provided, we replace the entire list
+  if (patch.children) {
+    await prisma.datasetMapping.update({
+      where: { id },
+      data: {
+        children: {
+          deleteMany: {}, // Clear existing
+          create: patch.children.map(c => ({
+            datasetId: c.datasetId,
+            alias: c.alias,
+            order: c.order || 0
+          }))
+        }
+      }
+    });
+  }
+
   await invalidateCache('dataset_mappings_all');
-  // Optional: In a highly optimized setup we should find the parentId to invalidate it, 
-  // but clearing the whole collection trace might be simpler if it frequently changes.
-  // For now, let's look up to invalidate the specific one.
-  const mapping = await db.collection<DatasetMapping>("dataset_mappings").findOne({ _id: new ObjectId(id) });
+  const mapping = await prisma.datasetMapping.findUnique({ where: { id } });
   if (mapping) await invalidateCache(`dataset_mappings_${mapping.parentId}`);
 
-  return result;
+  return { modifiedCount: 1 };
 }
 
 export async function deleteDatasetMapping(id: string) {
-  const client = await clientPromise;
-  const db = client.db();
-  const mapping = await db.collection<DatasetMapping>("dataset_mappings").findOne({ _id: new ObjectId(id) });
-  const result = await db.collection<DatasetMapping>("dataset_mappings").deleteOne({ _id: new ObjectId(id) });
-
-  await invalidateCache('dataset_mappings_all');
-  if (mapping) await invalidateCache(`dataset_mappings_${mapping.parentId}`);
-  return result;
+  const mapping = await prisma.datasetMapping.findUnique({ where: { id } });
+  if (mapping) {
+    await prisma.datasetMapping.delete({ where: { id } });
+    await invalidateCache('dataset_mappings_all');
+    await invalidateCache(`dataset_mappings_${mapping.parentId}`);
+  }
+  return { deletedCount: 1 };
 }

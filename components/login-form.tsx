@@ -29,11 +29,19 @@ export function LoginForm({
       headers: { "Content-Type": "application/json" },
     });
 
-    const check = await resCheck.json();
-    if (!check.exists) {
+    let check;
+    try {
+      check = await resCheck.json();
+    } catch (e) {
+      setLoading(false);
+      setMessage("Server connection failed during user check.");
+      return;
+    }
+
+    if (!resCheck.ok || !check.exists) {
       setLoading(false);
       setMessage(
-        "User does not exist. Please contact inquiry@bioinvision.com. or Signup to send request for Access."
+        check?.error || "User does not exist. Please contact inquiry@bioinvision.com. or Signup to send request for Access."
       );
       return;
     }
@@ -51,8 +59,12 @@ export function LoginForm({
       if (otpRes.ok) {
         router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
       } else {
-        const errorData = await otpRes.json();
-        setMessage(errorData.error || "Error sending OTP. Try again.");
+        let errorMsg = "Error sending OTP. Try again.";
+        try {
+          const errorData = await otpRes.json();
+          if (errorData.error) errorMsg = errorData.error;
+        } catch (e) {}
+        setMessage(errorMsg);
       }
     } catch (err: unknown) {
       console.error("LoginForm error:", err);

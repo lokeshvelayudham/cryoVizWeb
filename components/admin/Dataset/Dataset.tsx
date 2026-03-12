@@ -59,10 +59,20 @@ import ManageUsersDialog from "./ManageUsersDialog";
 import MediaManagementDialog from "./MediaManagementDialog";
 import { UploadStatusTable } from "./UploadStatusTable";
 
+interface Study {
+  _id: string;
+  id: string;
+  name: string;
+  poNo: string | null;
+  status: string;
+  institutionId: string;
+  institution: { id: string; name: string; abbr: string };
+}
+
 const uploadDatasetSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  institutionId: z.string().min(1, "Institution is required"),
+  studyId: z.string().min(1, "Study is required"),
   brightfield: z.any().optional(),
   fluorescent: z.any().optional(),
   alpha: z.any().optional(),
@@ -74,6 +84,7 @@ type UploadDatasetForm = z.infer<typeof uploadDatasetSchema>;
 export default function Datasets() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [studies, setStudies] = useState<Study[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -92,10 +103,15 @@ export default function Datasets() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin");
-      const data = await response.json();
+      const [adminRes, studiesRes] = await Promise.all([
+        fetch("/api/admin"),
+        fetch("/api/studies"),
+      ]);
+      const data = await adminRes.json();
+      const studiesData = await studiesRes.json();
       setDatasets(data.datasets || []);
       setInstitutions(data.institutions || []);
+      setStudies(studiesData.studies || []);
       setUsers(data.users || []);
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -143,14 +159,13 @@ export default function Datasets() {
       header: "Description",
     },
     {
-      accessorKey: "institutionId",
-      header: "Institution",
+      accessorKey: "studyId",
+      header: "Study",
       cell: ({ row }) => {
-        const institution = institutions.find(
-          (inst) =>
-            inst._id?.toString() === row.original.institutionId?.toString()
+        const study = studies.find(
+          (s) => s._id === row.original.studyId || s.id === row.original.studyId
         );
-        return institution ? institution.name : "N/A";
+        return study ? `${study.name} (${study.institution?.name || "N/A"})` : "N/A";
       },
     },
     {
@@ -213,7 +228,7 @@ export default function Datasets() {
     defaultValues: {
       name: "",
       description: "",
-      institutionId: "",
+      studyId: "",
       brightfield: null,
       fluorescent: null,
       alpha: null,
@@ -228,9 +243,7 @@ export default function Datasets() {
     resetDataset({
       name: dataset.name,
       description: dataset.description || "",
-      institutionId: dataset.institutionId
-        ? dataset.institutionId.toString()
-        : "",
+      studyId: dataset.studyId || "",
       brightfield: null,
       fluorescent: null,
       alpha: null,
@@ -429,7 +442,7 @@ export default function Datasets() {
 
   const onUploadSubmit = async (data: UploadDatasetForm) => {
     try {
-      console.log("Starting upload process with data:", { name: data.name, institutionId: data.institutionId });
+      console.log("Starting upload process with data:", { name: data.name, studyId: data.studyId });
       // Show loading state
       alert("Starting upload process... Please wait.");
       
@@ -462,7 +475,7 @@ export default function Datasets() {
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("description", data.description || "");
-      formData.append("institutionId", data.institutionId);
+      formData.append("studyId", data.studyId);
       formData.append("spacing", data.spacing || "");
       
       // Add file URLs instead of file objects
@@ -583,7 +596,7 @@ export default function Datasets() {
               </DialogHeader>
               <FormProvider {...datasetMethods}>
                 <DatasetFormPage1
-                  institutions={institutions}
+                  studies={studies}
                   onSubmit={(data: unknown) => onUploadSubmit(data as UploadDatasetForm)}
                 />
               </FormProvider>

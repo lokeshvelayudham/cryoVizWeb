@@ -225,6 +225,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             isActive: true,
             items: [
               { title: "Institutions", url: "/admin/institutions" },
+              { title: "Studies", url: "/admin/studies" },
               { title: "Users", url: "/admin/users" },
               { title: "Datasets", url: "/admin/dataset" },
               { title: "Mappings", url: "/admin/mappings" },

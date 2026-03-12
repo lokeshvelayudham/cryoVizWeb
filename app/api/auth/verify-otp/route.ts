@@ -1,30 +1,32 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { encode } from "next-auth/jwt";
-import clientPromise from "@/lib/mongodb";
+import prisma from "@/lib/prisma";
 import { updateUserLastLogin } from "@/lib/models";
 
 export async function POST(req: Request) {
   try {
     const { email, otp } = await req.json();
-    const client = await clientPromise;
-    const db = client.db();
+    
+    const match = await prisma.otp.findFirst({
+      where: { email, otp }
+    });
 
-    const match = await db.collection("otps").findOne({ email, otp });
     if (!match) {
       return NextResponse.json({ error: "Invalid OTP" }, { status: 401 });
     }
 
-    const user = await db.collection("users").findOne({ email });
+    const user = await prisma.user.findUnique({ where: { email } });
+    
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Update logins and lastLogin
-    await updateUserLastLogin(user._id.toString());
+    await updateUserLastLogin(user.id);
 
     // Clean up OTP
-    await db.collection("otps").deleteMany({ email });
+    await prisma.otp.deleteMany({ where: { email } });
 
     // Create JWT token with proper NextAuth format
     const now = Math.floor(Date.now() / 1000);
@@ -32,7 +34,7 @@ export async function POST(req: Request) {
       token: {
         name: user.name || user.email,
         email: user.email,
-        sub: user._id.toString(),
+        sub: user.id,
         accessLevel: user.accessLevel,
         iat: now,
         exp: now + (7 * 24 * 60 * 60), // 7 days

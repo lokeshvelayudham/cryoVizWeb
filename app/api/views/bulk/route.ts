@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 
 export async function DELETE(req: NextRequest) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
     const body = await req.json();
     const { ids, datasetId } = body;
 
@@ -13,18 +10,19 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ids and datasetId are required" }, { status: 400 });
     }
 
-    const objectIds = ids.map((id: string) => new ObjectId(id));
-    const result = await db.collection("views").deleteMany({
-      _id: { $in: objectIds },
-      datasetId,
+    const result = await prisma.view.deleteMany({
+      where: {
+        id: { in: ids },
+        datasetId: datasetId
+      }
     });
 
-    if (result.deletedCount === 0) {
+    if (result.count === 0) {
       return NextResponse.json({ error: "No views found" }, { status: 404 });
     }
 
     return NextResponse.json(
-      { message: "Views deleted successfully", deletedCount: result.deletedCount },
+      { message: "Views deleted successfully", deletedCount: result.count },
       { status: 200 }
     );
   } catch (error) {

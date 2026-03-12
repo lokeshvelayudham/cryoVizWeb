@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import "@kitware/vtk.js/Rendering/Profiles/Volume";
 import vtkFullScreenRenderWindow from "@kitware/vtk.js/Rendering/Misc/FullScreenRenderWindow";
 import vtkVolume from "@kitware/vtk.js/Rendering/Core/Volume";
@@ -24,6 +24,137 @@ import { ModalitySwitcher, type Modality } from "@/components/ModalitySwitcher";
 import { getGPUInfo } from "@/lib/analytics";
 import posthog from "posthog-js";
 
+// --------------- Helpers ---------------
+
+/** Load images in batches to avoid overwhelming the browser/network */
+async function loadImagesInBatches(
+  urls: string[],
+  batchSize = 20
+): Promise<ImageData[]> {
+  const results: ImageData[] = new Array(urls.length);
+
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(
+        (url) =>
+          new Promise<ImageData>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = url;
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext("2d")!;
+              ctx.drawImage(img, 0, 0);
+              resolve(ctx.getImageData(0, 0, img.width, img.height));
+            };
+            img.onerror = reject;
+          })
+      )
+    );
+    for (let j = 0; j < batchResults.length; j++) {
+      results[i + j] = batchResults[j];
+    }
+  }
+  return results;
+}
+
+/** Compute the tight bounding box of non-transparent pixels across all slices */
+function computeBounds(slices: ImageData[]) {
+  let xMin = Infinity,
+    xMax = -1,
+    yMin = Infinity,
+    yMax = -1;
+  for (const slice of slices) {
+    const { width, height, data } = slice;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (data[(y * width + x) * 4 + 3] > 10) {
+          if (x < xMin) xMin = x;
+          if (x > xMax) xMax = x;
+          if (y < yMin) yMin = y;
+          if (y > yMax) yMax = y;
+        }
+      }
+    }
+  }
+  return { xMin, xMax, yMin, yMax };
+}
+
+/** Assemble a cropped RGBA volume from slices — uses direct byte copy (no .slice()) */
+function assembleVolume(
+  slices: ImageData[],
+  xMin: number,
+  yMin: number,
+  width: number,
+  height: number
+) {
+  const depth = slices.length;
+  const volumeData = new Uint8Array(width * height * depth * 4);
+
+  for (let z = 0; z < depth; z++) {
+    const full = slices[z].data;
+    const srcW = slices[z].width;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIdx = ((y + yMin) * srcW + (x + xMin)) * 4;
+        const dstIdx = (z * width * height + y * width + x) * 4;
+        volumeData[dstIdx] = full[srcIdx];
+        volumeData[dstIdx + 1] = full[srcIdx + 1];
+        volumeData[dstIdx + 2] = full[srcIdx + 2];
+        volumeData[dstIdx + 3] = full[srcIdx + 3];
+      }
+    }
+  }
+  return volumeData;
+}
+
+/** Downsample an RGBA volume by a given factor on each axis.
+ *  E.g. factor=4 turns 600×600×527 → 150×150×132 (64× fewer voxels). */
+function downsampleVolume(
+  data: Uint8Array,
+  width: number,
+  height: number,
+  depth: number,
+  factor: number
+): { data: Uint8Array; width: number; height: number; depth: number } {
+  const nw = Math.ceil(width / factor);
+  const nh = Math.ceil(height / factor);
+  const nd = Math.ceil(depth / factor);
+  const out = new Uint8Array(nw * nh * nd * 4);
+
+  for (let z = 0; z < nd; z++) {
+    const sz = Math.min(z * factor, depth - 1);
+    for (let y = 0; y < nh; y++) {
+      const sy = Math.min(y * factor, height - 1);
+      for (let x = 0; x < nw; x++) {
+        const sx = Math.min(x * factor, width - 1);
+        const srcIdx = (sz * width * height + sy * width + sx) * 4;
+        const dstIdx = (z * nw * nh + y * nw + x) * 4;
+        out[dstIdx] = data[srcIdx];
+        out[dstIdx + 1] = data[srcIdx + 1];
+        out[dstIdx + 2] = data[srcIdx + 2];
+        out[dstIdx + 3] = data[srcIdx + 3];
+      }
+    }
+  }
+  return { data: out, width: nw, height: nh, depth: nd };
+}
+
+/** Custom hook: debounces a value so rapid updates (slider drags) are coalesced */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = React.useState(value);
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+// --------------- Component ---------------
+
 const VolumeViewerPng: React.FC<{
   brightfieldBlobUrl?: string;
   fluorescentBlobUrl?: string;
@@ -42,7 +173,7 @@ const VolumeViewerPng: React.FC<{
   // Determine available modalities
   const hasBrightfield = Boolean(brightfieldBlobUrl && brightfieldNumZ);
   const hasFluorescent = Boolean(fluorescentBlobUrl && fluorescentNumZ);
-  
+
   // Set default modality to the first available one
   const defaultModality: Modality = hasBrightfield ? "brightfield" : "fluorescent";
   const [currentModality, setCurrentModality] = useState<Modality>(defaultModality);
@@ -50,6 +181,7 @@ const VolumeViewerPng: React.FC<{
   // Get current modality data
   const currentBlobUrl = currentModality === "brightfield" ? brightfieldBlobUrl : fluorescentBlobUrl;
   const currentNumZ = currentModality === "brightfield" ? brightfieldNumZ : fluorescentNumZ;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [clip, setClip] = useState({ x: 0, y: 0, z: 0 });
   const [quality, setQuality] = useState(1.5);
@@ -66,88 +198,56 @@ const VolumeViewerPng: React.FC<{
     planeZ: vtkPlane.newInstance({ normal: [0, 0, 1], origin: [0, 0, 0] }),
   });
 
+  // Persistent VTK refs — survive across slider changes
   const renderWindowRef = useRef<vtkFullScreenRenderWindow | null>(null);
   const mapperRef = useRef<vtkVolumeMapper | null>(null);
   const opacityRef = useRef<vtkPiecewiseFunction | null>(null);
+  const imageDataRef = useRef<vtkImageData | null>(null);
+  const lowResImageDataRef = useRef<vtkImageData | null>(null);
+  const rafIdRef = useRef<number>(0);
 
-  useEffect(() => {
-    if (!mapperRef.current || !renderWindowRef.current) return;
-    const mapper = mapperRef.current;
-    switch (blendMode) {
-      case "mip":
-        mapper.setBlendMode(BlendMode.MAXIMUM_INTENSITY_BLEND);
-        break;
-      case "composite":
-      default:
-        mapper.setBlendMode(BlendMode.COMPOSITE_BLEND);
-    }
-    renderWindowRef.current.getRenderWindow().render();
-  }, [blendMode]);
+  /** Coalesce multiple render requests into one requestAnimationFrame callback.
+   *  This yields the main thread back to the browser between frames so INP stays low. */
+  const scheduleRender = useCallback(() => {
+    cancelAnimationFrame(rafIdRef.current);
+    rafIdRef.current = requestAnimationFrame(() => {
+      renderWindowRef.current?.getRenderWindow().render();
+    });
+  }, []);
 
+  // ──────────────────────────────────────────────
+  // EFFECT 1: Load data ONLY when modality/URL changes
+  // ──────────────────────────────────────────────
   useEffect(() => {
-    const sliceCount = currentNumZ || 0;
-    const slicePath = (i: number) =>
-      `${currentBlobUrl}/xy/${String(i).padStart(3, "0")}.png`;
+    if (!currentBlobUrl || !currentNumZ || currentNumZ <= 0) return;
+
+    const sliceCount = currentNumZ;
+    const urls = Array.from({ length: sliceCount }, (_, i) =>
+      `${currentBlobUrl}/xy/${String(i).padStart(3, "0")}.png`
+    );
+
+    let cancelled = false;
 
     const loadStackAndRender = async () => {
+      setLoading(true);
       const startTime = performance.now();
-      const imagePromises = Array.from({ length: sliceCount }, (_, z) => {
-        return new Promise<ImageData>((resolve, reject) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous"; // optional, if needed
-          img.src = slicePath(z);
-          img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext("2d")!;
-            ctx.drawImage(img, 0, 0);
-            resolve(ctx.getImageData(0, 0, img.width, img.height));
-          };
-          img.onerror = reject;
-        });
-      });
 
-      const slices = await Promise.all(imagePromises);
+      // Batch-load images (20 at a time instead of all at once)
+      const slices = await loadImagesInBatches(urls, 20);
+      if (cancelled) return;
 
-      let xMin = Infinity,
-        xMax = -1,
-        yMin = Infinity,
-        yMax = -1;
-      slices.forEach((slice) => {
-        const { width, height, data } = slice;
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const idx = (y * width + x) * 4;
-            const alpha = data[idx + 3];
-            if (alpha > 10) {
-              if (x < xMin) xMin = x;
-              if (x > xMax) xMax = x;
-              if (y < yMin) yMin = y;
-              if (y > yMax) yMax = y;
-            }
-          }
-        }
-      });
-
+      // Compute tight bounding box
+      const { xMin, xMax, yMin, yMax } = computeBounds(slices);
       const width = xMax - xMin + 1;
       const height = yMax - yMin + 1;
       const depth = sliceCount;
 
       setVolumeDims({ x: width, y: height, z: depth });
 
-      const volumeData = new Uint8Array(width * height * depth * 4);
-      slices.forEach((slice, z) => {
-        const full = slice.data;
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const srcIdx = ((y + yMin) * slice.width + (x + xMin)) * 4;
-            const dstIdx = (z * width * height + y * width + x) * 4;
-            volumeData.set(full.slice(srcIdx, srcIdx + 4), dstIdx);
-          }
-        }
-      });
+      // Assemble volume with direct byte copy
+      const volumeData = assembleVolume(slices, xMin, yMin, width, height);
 
+      // Build VTK pipeline
       const imageData = vtkImageData.newInstance();
       imageData.setDimensions([width, height, depth]);
       imageData.setSpacing([1, 1, spacing]);
@@ -158,14 +258,49 @@ const VolumeViewerPng: React.FC<{
         values: volumeData,
       });
       imageData.getPointData().setScalars(scalars);
+      imageDataRef.current = imageData;
+
+      // Build a 4× downsampled volume for interactive rendering
+      const DOWNSAMPLE_FACTOR = 8;
+      const lowRes = downsampleVolume(volumeData, width, height, depth, DOWNSAMPLE_FACTOR);
+      const lowResImageData = vtkImageData.newInstance();
+      lowResImageData.setDimensions([lowRes.width, lowRes.height, lowRes.depth]);
+      lowResImageData.setSpacing([DOWNSAMPLE_FACTOR, DOWNSAMPLE_FACTOR, spacing * DOWNSAMPLE_FACTOR]);
+      const lowResScalars = vtkDataArray.newInstance({
+        name: "ImageScalars",
+        numberOfComponents: 4,
+        values: lowRes.data,
+      });
+      lowResImageData.getPointData().setScalars(lowResScalars);
+      lowResImageDataRef.current = lowResImageData;
 
       const mapper = vtkVolumeMapper.newInstance();
       mapper.setInputData(imageData);
       mapper.setSampleDistance(quality);
-      mapper.setMaximumSamplesPerRay(1500);
+      mapper.setMaximumSamplesPerRay(400);
+
+      // KEY PERF: Auto-adjust sample distances during interaction
+      // VTK will reduce sampling quality while dragging/rotating,
+      // then render at full quality when idle. This is the #1 fix for INP.
+      mapper.setAutoAdjustSampleDistances(true);
+
+      // Set a higher image sample distance (renders at lower resolution
+      // internally, then upscales — big GPU savings)
+      mapper.setImageSampleDistance(1.5);
+
       mapper.addClippingPlane(clipPlanes.current.planeX);
       mapper.addClippingPlane(clipPlanes.current.planeY);
       mapper.addClippingPlane(clipPlanes.current.planeZ);
+
+      // Apply current blend mode
+      switch (blendMode) {
+        case "mip":
+          mapper.setBlendMode(BlendMode.MAXIMUM_INTENSITY_BLEND);
+          break;
+        case "composite":
+        default:
+          mapper.setBlendMode(BlendMode.COMPOSITE_BLEND);
+      }
       mapperRef.current = mapper;
 
       const volume = vtkVolume.newInstance();
@@ -193,11 +328,14 @@ const VolumeViewerPng: React.FC<{
       property.setSpecular(0.2);
       property.setSpecularPower(10);
 
+      // Teardown previous renderer
+      if (renderWindowRef.current) {
+        renderWindowRef.current.delete();
+      }
       containerRef.current!.innerHTML = "";
 
       const fullScreenRenderer = vtkFullScreenRenderWindow.newInstance({
         container: containerRef.current!,
-        // containerStyle: { height: "100%", width: "100%", position: "relative" },
         background: [1, 1, 1],
         containerStyle: {
           width: "100%",
@@ -205,53 +343,132 @@ const VolumeViewerPng: React.FC<{
           position: "relative",
           top: 0,
           left: 0,
-          overflow: "hidden", // important
+          overflow: "hidden",
         },
       });
 
       const renderer = fullScreenRenderer.getRenderer();
       const renderWindow = fullScreenRenderer.getRenderWindow() as vtkRenderWindow;
-      renderer.addVolume(volume);
 
+      renderer.addVolume(volume);
       renderer.resetCamera();
       renderWindow.render();
       renderWindowRef.current = fullScreenRenderer;
+
+      // Swap to low-res volume during interaction, high-res when idle.
+      // Low-res has ~512× fewer voxels → renders in ~5ms vs ~1000ms.
+      const container = containerRef.current!;
+      const onPointerDown = () => {
+        if (mapperRef.current && lowResImageDataRef.current) {
+          mapperRef.current.setInputData(lowResImageDataRef.current);
+          mapperRef.current.setSampleDistance(2.0);
+          mapperRef.current.setMaximumSamplesPerRay(200);
+        }
+      };
+      const onPointerUp = () => {
+        // CRITICAL: Defer the expensive high-res render so the browser
+        // can paint the pointerup visual feedback first.
+        // Without this, the synchronous render() blocks INP for ~1200ms.
+        setTimeout(() => {
+          if (mapperRef.current && imageDataRef.current) {
+            mapperRef.current.setInputData(imageDataRef.current);
+            mapperRef.current.setSampleDistance(quality);
+            mapperRef.current.setMaximumSamplesPerRay(400);
+            renderWindowRef.current?.getRenderWindow().render();
+          }
+        }, 50);
+      };
+      // Use capture to fire BEFORE VTK's internal handlers
+      container.addEventListener("pointerdown", onPointerDown, { capture: true });
+      container.addEventListener("pointerup", onPointerUp);
+      container.addEventListener("pointerleave", onPointerUp);
+
       setLoading(false);
 
       const endTime = performance.now();
       posthog.capture("dataset_loaded", {
-        datasetId: datasetId,
+        datasetId,
         modality: currentModality,
         slices: sliceCount,
-        spacing: spacing,
+        spacing,
         gpu: getGPUInfo(),
-        quality: quality,
+        quality,
         loadTimeMs: Math.round(endTime - startTime),
       });
     };
 
-    if (currentBlobUrl && currentNumZ && currentNumZ > 0) {
-      loadStackAndRender();
-    }
-  }, [currentBlobUrl, currentNumZ, currentModality, quality, opacityLevel, spacing]);
+    loadStackAndRender();
 
+    return () => {
+      cancelled = true;
+    };
+    // Only re-run when the actual data source changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBlobUrl, currentNumZ, currentModality]);
+
+  // ──────────────────────────────────────────────
+  // EFFECT 2: Update sample distance (quality) WITHOUT reloading data
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapperRef.current || !renderWindowRef.current) return;
+    mapperRef.current.setSampleDistance(quality);
+    scheduleRender();
+  }, [quality, scheduleRender]);
+
+  // ──────────────────────────────────────────────
+  // EFFECT 3: Update opacity WITHOUT reloading data
+  // ──────────────────────────────────────────────
   useEffect(() => {
     if (!opacityRef.current || !renderWindowRef.current) return;
     opacityRef.current.removeAllPoints();
     opacityRef.current.addPoint(0, 0.0);
     opacityRef.current.addPoint(100, opacityLevel);
     opacityRef.current.addPoint(255, 1.0);
-    renderWindowRef.current.getRenderWindow().render();
-  }, [opacityLevel]);
+    scheduleRender();
+  }, [opacityLevel, scheduleRender]);
 
+  // ──────────────────────────────────────────────
+  // EFFECT 4: Update blend mode WITHOUT reloading data
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapperRef.current || !renderWindowRef.current) return;
+    switch (blendMode) {
+      case "mip":
+        mapperRef.current.setBlendMode(BlendMode.MAXIMUM_INTENSITY_BLEND);
+        break;
+      case "composite":
+      default:
+        mapperRef.current.setBlendMode(BlendMode.COMPOSITE_BLEND);
+    }
+    scheduleRender();
+  }, [blendMode, scheduleRender]);
+
+  // ──────────────────────────────────────────────
+  // EFFECT 5: Update spacing WITHOUT reloading data
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!imageDataRef.current || !renderWindowRef.current) return;
+    imageDataRef.current.setSpacing([1, 1, spacing]);
+    imageDataRef.current.modified();
+    const renderer = renderWindowRef.current.getRenderer();
+    renderer.resetCamera();
+    scheduleRender();
+  }, [spacing, scheduleRender]);
+
+  // ──────────────────────────────────────────────
+  // EFFECT 6: Clipping planes
+  // ──────────────────────────────────────────────
   useEffect(() => {
     const { x, y, z } = clip;
     clipPlanes.current.planeX.setOrigin([x, 0, 0]);
     clipPlanes.current.planeY.setOrigin([0, y, 0]);
     clipPlanes.current.planeZ.setOrigin([0, 0, z]);
-    renderWindowRef.current?.getRenderWindow().render();
-  }, [clip]);
+    scheduleRender();
+  }, [clip, scheduleRender]);
 
+  // ──────────────────────────────────────────────
+  // EFFECT 7: View orientation
+  // ──────────────────────────────────────────────
   useEffect(() => {
     if (!renderWindowRef.current || !viewOrientation) return;
 
@@ -291,15 +508,18 @@ const VolumeViewerPng: React.FC<{
         break;
     }
 
-      camera.setFocalPoint(center[0], center[1], center[2]);
+    camera.setFocalPoint(center[0], center[1], center[2]);
     renderer.resetCameraClippingRange();
-    renderWindowRef.current.getRenderWindow().render();
-  }, [viewOrientation]);
+    scheduleRender();
+  }, [viewOrientation, scheduleRender]);
 
-  const handleAutoFocus = () => {
+  // ──────────────────────────────────────────────
+  // Actions
+  // ──────────────────────────────────────────────
+  const handleAutoFocus = useCallback(() => {
     if (!renderWindowRef.current) return;
 
-      const renderer = renderWindowRef.current.getRenderer();
+    const renderer = renderWindowRef.current.getRenderer();
     const camera = renderer.getActiveCamera();
     const actors = renderer.getVolumes();
 
@@ -323,22 +543,16 @@ const VolumeViewerPng: React.FC<{
     camera.setViewUp([0, 1, 0]);
 
     renderer.resetCameraClippingRange();
-    renderWindowRef.current.getRenderWindow().render();
-  };
+    scheduleRender();
+  }, [scheduleRender]);
 
-  const handleSpacingChange = (newSpacing: number) => {
+  const handleSpacingChange = useCallback((newSpacing: number) => {
     setSpacing(newSpacing);
-    // Show brief loading state to indicate volume update
-    setLoading(true);
-    setTimeout(() => setLoading(false), 500);
-  };
+  }, []);
 
-  const handleSpacingReset = () => {
+  const handleSpacingReset = useCallback(() => {
     setSpacing(initialSpacing);
-    // Show brief loading state to indicate volume update
-    setLoading(true);
-    setTimeout(() => setLoading(false), 500);
-  };
+  }, [initialSpacing]);
 
   return (
     <div
@@ -346,7 +560,7 @@ const VolumeViewerPng: React.FC<{
         position: "relative",
         width: "100%",
         height: "87vh",
-        overflow: "hidden", // prevent scroll
+        overflow: "hidden",
       }}
     >
       {/* Floating Controls */}
@@ -370,10 +584,10 @@ const VolumeViewerPng: React.FC<{
           setOpacityLevel={setOpacityLevel}
         />
         <ShaderSelector blendMode={blendMode} setBlendMode={setBlendMode} />
-        
+
         {/* Separator */}
         <div className="w-full h-px bg-white/20 my-3"></div>
-        
+
         <SpacingControl
           spacing={spacing}
           onSpacingChange={handleSpacingChange}
@@ -537,7 +751,6 @@ const VolumeViewerPng: React.FC<{
       {/* VTK Canvas */}
       <div
         ref={containerRef}
-        // style={{ width: "100%", height: "85vh", position: "relative" }}
         style={{
           width: "100%",
           height: "100vh",

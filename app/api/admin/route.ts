@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BlobServiceClient } from "@azure/storage-blob";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import prisma from "@/lib/prisma";
 import {
   getInstitutions,
   getUsers,
@@ -22,7 +21,6 @@ import { createDatasetAssignmentNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
 
 // ---------- utils ----------
 const isObj = (x: unknown): x is Record<string, unknown> =>
@@ -79,19 +77,17 @@ export async function POST(request: NextRequest) {
   try {
     switch (body.action) {
       case "dataset": {
-        // Expect a Dataset sans _id/createdAt (createDataset handles cleanup)
         const data = body as Omit<Dataset, "_id" | "createdAt"> & { action: "dataset" };
         const result = await createDataset(data);
         return NextResponse.json({ success: true, id: result.insertedId.toString() });
       }
 
       case "institution": {
-        // Minimal Institution fields; model adds createdAt
         const b = body as { action: "institution" } & Partial<Institution>;
         if (typeof b.name !== "string" || typeof b.abbr !== "string") {
           return NextResponse.json({ error: "Missing name/abbr" }, { status: 400 });
         }
-        const inst: Omit<Institution, "_id" | "createdAt"> = {
+        const inst: Omit<Institution, "_id" | "createdAt" | "updatedAt"> = {
           name: b.name,
           abbr: b.abbr,
           type: (b.type as Institution["type"]) ?? "Others",
@@ -111,15 +107,14 @@ export async function POST(request: NextRequest) {
         if (typeof b.email !== "string" || typeof b.name !== "string") {
           return NextResponse.json({ error: "Missing name/email" }, { status: 400 });
         }
-        if (!(b.institutionId instanceof ObjectId) && typeof b.institutionId !== "string") {
+        if (typeof b.institutionId !== "string" && typeof b.institutionId !== "object") {
           return NextResponse.json({ error: "Invalid institutionId" }, { status: 400 });
         }
-        const user: Omit<User, "_id" | "logins" | "lastLogin" | "assignedDatasets"> = {
+        const user: Omit<User, "_id" | "logins" | "lastLogin" | "assignedDatasets" | "createdAt" | "updatedAt"> = {
           name: b.name,
           email: b.email,
           accessLevel: (b.accessLevel as User["accessLevel"]) ?? "user",
-          institutionId:
-            b.institutionId instanceof ObjectId ? b.institutionId : new ObjectId(b.institutionId),
+          institutionId: b.institutionId as string,
         };
         const result = await createUser(user);
         return NextResponse.json({ success: true, id: result.insertedId.toString() });
@@ -133,31 +128,23 @@ export async function POST(request: NextRequest) {
 
         const result = await updateUserDatasets(b.email, b.datasets);
 
-        // Create notifications for newly assigned datasets
         if (result.modifiedCount > 0) {
           try {
-            const client = await clientPromise;
-            const db = client.db();
-
-            // Get user details
-            const user = await db.collection("users").findOne({ email: b.email });
+            const user = await prisma.user.findUnique({ where: { email: b.email } });
             if (user) {
-              // Get dataset names for notifications
               const datasetIds = b.datasets as string[];
-              const datasets = await db.collection("datasets")
-                .find({ _id: { $in: datasetIds.map(id => new ObjectId(id)) } })
-                .toArray();
+              const datasets = await prisma.dataset.findMany({
+                where: { id: { in: datasetIds } }
+              });
 
-              // Create notifications for each dataset
               for (const dataset of datasets) {
                 await createDatasetAssignmentNotification(
-                  user._id.toString(),
+                  user.id,
                   dataset.name || "Unknown Dataset"
                 );
               }
             }
           } catch (notificationError) {
-            // Don't fail the assignment if notification creation fails
             console.error("Failed to create dataset assignment notifications:", notificationError);
           }
         }
@@ -188,18 +175,15 @@ export async function PUT(request: NextRequest) {
   try {
     switch (body.action) {
       case "update-institution": {
-        // Convert string id -> ObjectId and pass full Institution shape to model
         const b = body as {
           action: "update-institution";
-          _id?: string | ObjectId;
+          _id?: string;
         } & Partial<Institution>;
         if (!b._id) return NextResponse.json({ error: "_id required" }, { status: 400 });
 
-        const _id = b._id instanceof ObjectId ? b._id : new ObjectId(b._id);
-        const inst: Institution = {
-          ...(b as Institution),
-          _id,
-          createdAt: (b.createdAt as Date) ?? new Date(0), // not used by update
+        const inst: any = {
+          ...(b as any),
+          _id: b._id,
         };
         const result = await updateInstitution(inst);
         return NextResponse.json({ success: !!result.modifiedCount });
@@ -208,17 +192,16 @@ export async function PUT(request: NextRequest) {
       case "update-user": {
         const b = body as {
           action: "update-user";
-          _id?: string | ObjectId;
+          _id?: string;
         } & Partial<User>;
         if (!b._id || typeof b.email !== "string") {
           return NextResponse.json({ error: "Missing _id/email" }, { status: 400 });
         }
-        const _id = b._id instanceof ObjectId ? b._id : new ObjectId(b._id);
-        const user: User = {
-          ...(b as User),
-          _id,
-          institutionId:
-            b.institutionId instanceof ObjectId ? b.institutionId : new ObjectId(b.institutionId as unknown as string),
+        
+        const user: any = {
+          ...(b as any),
+          _id: b._id,
+          institutionId: b.institutionId,
           logins: b.logins ?? 0,
           assignedDatasets: Array.isArray(b.assignedDatasets) ? b.assignedDatasets : [],
         };
@@ -229,15 +212,13 @@ export async function PUT(request: NextRequest) {
       case "update-dataset": {
         const b = body as {
           action: "update-dataset";
-          _id?: string | ObjectId;
+          _id?: string;
         } & Partial<Dataset>;
         if (!b._id) return NextResponse.json({ error: "_id required" }, { status: 400 });
-        const _id = b._id instanceof ObjectId ? b._id : new ObjectId(b._id);
-        const dataset: Dataset = {
-          // model’s updateDataset expects Dataset with _id
-          ...(b as Dataset),
-          _id,
-          createdAt: (b.createdAt as Date) ?? new Date(0), // placeholder; not used in update
+        
+        const dataset: any = {
+          ...(b as any),
+          _id: b._id,
         };
         const result = await updateDataset(dataset);
         return NextResponse.json({ success: !!result.modifiedCount });
@@ -273,29 +254,21 @@ export async function DELETE(request: NextRequest) {
     }
     if (action === "delete-dataset") {
       try {
-        // Fetch dataset to discover datasetId / blob prefixes
-        const client = await clientPromise;
-        const db = client.db();
-        const dataset = await db.collection("datasets").findOne({ _id: new ObjectId(id) });
+        const dataset = await prisma.dataset.findUnique({ where: { id } });
 
-        // Attempt Azure cleanup if configured
         const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-        if (connectionString) {
+        if (connectionString && dataset) {
           const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
           const containerName = process.env.AZURE_CONTAINER || "cryovizweb";
           const containerClient = blobServiceClient.getContainerClient(containerName);
 
-          // Determine prefix (prefer datasetId)
           let prefix: string | null = null;
-          if (dataset?.datasetId) {
+          if (dataset.datasetId) {
             prefix = `dataset-${dataset.datasetId}/`;
-          } else if (dataset?.brightfieldBlobUrl) {
+          } else if (dataset.brightfieldBlobUrl) {
             try {
               const url = new URL(dataset.brightfieldBlobUrl as string);
               const parts = url.pathname.split("/").filter(Boolean);
-              // parts[0] is container, rest is path
-              prefix = parts.slice(1, 3).join("/") + "/"; // e.g., dataset-<id>/<modality>/ → trim to dataset-<id>/ if possible
-              // Ensure we only keep dataset-<id>/
               const dsIdx = parts.findIndex(p => p && p.startsWith("dataset-"));
               if (dsIdx >= 1) {
                 prefix = parts.slice(dsIdx, dsIdx + 1).join("/") + "/";
@@ -304,7 +277,6 @@ export async function DELETE(request: NextRequest) {
           }
 
           if (prefix) {
-            // Delete all blobs under prefix
             for await (const blob of containerClient.listBlobsFlat({ prefix })) {
               try {
                 await containerClient.deleteBlob(blob.name);
@@ -315,12 +287,10 @@ export async function DELETE(request: NextRequest) {
           }
         }
 
-        // Finally, remove dataset document
         const r = await deleteDataset(id);
         return NextResponse.json({ success: !!r.deletedCount });
       } catch (e) {
         console.error("DELETE dataset with Azure cleanup error:", e);
-        // Attempt DB delete anyway to avoid blocking UI
         const r = await deleteDataset(id);
         return NextResponse.json({ success: !!r.deletedCount, warning: "Azure cleanup may have failed" });
       }

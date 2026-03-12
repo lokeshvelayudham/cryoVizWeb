@@ -1,8 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
-
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -21,26 +20,27 @@ interface UploadStatus {
 
 const updateUploadStatus = async (uploadId: string, userId: string, update: Partial<UploadStatus>) => {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-
-    await db.collection<UploadStatus>("upload_status").updateOne(
-      { uploadId, userId },
-      {
-        $set: update,
-        $setOnInsert: {
-          uploadId,
-          userId,
-          startedAt: new Date(),
-        }
+    await prisma.uploadStatus.upsert({
+      where: { uploadId },
+      update: {
+        ...update,
+        result: update.result ? JSON.stringify(update.result) : undefined,
       },
-      { upsert: true }
-    );
+      create: {
+        uploadId,
+        userId,
+        status: update.status || "pending",
+        progress: update.progress || 0,
+        message: update.message || "Starting upload...",
+        datasetName: update.datasetName || "Unknown Dataset",
+        startedAt: new Date(),
+        result: update.result ? JSON.stringify(update.result) : undefined
+      }
+    });
   } catch (error) {
     console.error("Error updating upload status:", error);
   }
 };
-
 
 // POST - Start async upload
 export async function POST(request: NextRequest) {
@@ -114,5 +114,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-

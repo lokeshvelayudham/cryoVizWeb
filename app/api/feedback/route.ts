@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -18,28 +18,28 @@ interface FeedbackData {
 // ---------- GET - Fetch user's feedback ----------
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    
-    // Get user ID from email
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Fetch user's feedback, sorted by creation date (newest first)
-    const feedback = await db.collection("feedback")
-      .find({ userId: user._id.toString() })
-      .sort({ createdAt: -1 })
-      .limit(50) // Limit to last 50 feedback items
-      .toArray();
+    const feedback = await prisma.feedback.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
 
-    return NextResponse.json({ feedback });
+    const formattedFeedback = feedback.map(f => ({
+      ...f,
+      _id: f.id,
+    }));
+
+    return NextResponse.json({ feedback: formattedFeedback });
   } catch (error) {
     console.error("GET /api/feedback error:", error);
     return NextResponse.json({ error: "Failed to fetch feedback" }, { status: 500 });
@@ -49,7 +49,7 @@ export async function GET() {
 // ---------- POST - Create new feedback ----------
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -57,61 +57,45 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { type, category, priority, title, description, rating }: FeedbackData = body;
 
-    // Validate required fields
     if (!type || !category || !priority || !title || !description) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Validate enum values
     const validTypes = ['bug', 'feature', 'improvement', 'general'];
     const validCategories = ['ui', 'functionality', 'performance', 'data', 'other'];
     const validPriorities = ['low', 'medium', 'high', 'critical'];
 
-    if (!validTypes.includes(type)) {
-      return NextResponse.json({ error: "Invalid feedback type" }, { status: 400 });
-    }
-    if (!validCategories.includes(category)) {
-      return NextResponse.json({ error: "Invalid category" }, { status: 400 });
-    }
-    if (!validPriorities.includes(priority)) {
-      return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
-    }
-
-    // Validate rating if provided
+    if (!validTypes.includes(type)) return NextResponse.json({ error: "Invalid feedback type" }, { status: 400 });
+    if (!validCategories.includes(category)) return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+    if (!validPriorities.includes(priority)) return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
+    
     if (rating !== undefined && (rating < 1 || rating > 5)) {
       return NextResponse.json({ error: "Rating must be between 1 and 5" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Get user details
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Create feedback document
-    const feedback = {
-      userId: user._id.toString(),
-      userEmail: session.user.email,
-      userName: session.user.name || session.user.email,
-      type,
-      category,
-      priority,
-      title: title.trim(),
-      description: description.trim(),
-      rating: rating || undefined,
-      status: 'pending' as const,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    const feedback = await prisma.feedback.create({
+      data: {
+        userId: user.id,
+        userEmail: session.user.email,
+        userName: session.user.name || session.user.email,
+        type,
+        category,
+        priority,
+        title: title.trim(),
+        description: description.trim(),
+        rating: rating || null,
+        status: 'pending'
+      }
+    });
 
-    const result = await db.collection("feedback").insertOne(feedback);
-    
     return NextResponse.json({ 
       success: true, 
-      id: result.insertedId.toString(),
+      id: feedback.id,
       message: "Feedback submitted successfully"
     });
   } catch (error) {
@@ -123,7 +107,7 @@ export async function POST(request: NextRequest) {
 // ---------- PUT - Update feedback status (admin only) ----------
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -135,25 +119,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Missing feedback ID or status" }, { status: 400 });
     }
 
-    // Validate status
     const validStatuses = ['pending', 'in-progress', 'resolved', 'closed'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Check if user is admin
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user || user.accessLevel !== 'admin') {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
-    // Update feedback
-    const updateData: Record<string, unknown> = {
+    const updateData: any = {
       status,
-      updatedAt: new Date()
     };
 
     if (adminResponse) {
@@ -161,14 +138,15 @@ export async function PUT(request: NextRequest) {
       updateData.adminResponseAt = new Date();
     }
 
-    const result = await db.collection("feedback").updateOne(
-      { _id: new ObjectId(feedbackId) },
-      { $set: updateData }
-    );
-
-    if (result.matchedCount === 0) {
+    const existingFeedback = await prisma.feedback.findUnique({ where: { id: feedbackId } });
+    if (!existingFeedback) {
       return NextResponse.json({ error: "Feedback not found" }, { status: 404 });
     }
+
+    await prisma.feedback.update({
+      where: { id: feedbackId },
+      data: updateData
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -180,7 +158,7 @@ export async function PUT(request: NextRequest) {
 // ---------- DELETE - Delete feedback (user can delete their own, admin can delete any) ----------
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -192,34 +170,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Feedback ID required" }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-
-    // Get user details
-    const user = await db.collection("users").findOne({ email: session.user.email });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Check if user can delete this feedback
-    const feedback = await db.collection("feedback").findOne({ _id: new ObjectId(feedbackId) });
+    const feedback = await prisma.feedback.findUnique({ where: { id: feedbackId } });
     if (!feedback) {
       return NextResponse.json({ error: "Feedback not found" }, { status: 404 });
     }
 
-    // User can only delete their own feedback, admin can delete any
-    if (feedback.userId !== user._id.toString() && user.accessLevel !== 'admin') {
+    if (feedback.userId !== user.id && user.accessLevel !== 'admin') {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    // Delete feedback
-    const result = await db.collection("feedback").deleteOne({
-      _id: new ObjectId(feedbackId)
-    });
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ error: "Failed to delete feedback" }, { status: 500 });
-    }
+    await prisma.feedback.delete({ where: { id: feedbackId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

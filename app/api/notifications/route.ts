@@ -27,7 +27,8 @@ export async function GET() {
     });
 
     // Map id to _id and parse metadata for the frontend
-    const formattedNotifications = notifications.map(notif => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formattedNotifications = notifications.map((notif: any) => ({
       ...notif,
       _id: notif.id,
       metadata: notif.metadata ? JSON.parse(notif.metadata) : null,

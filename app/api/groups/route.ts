@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([], { status: 200 });
     }
 
-    const formattedGroups = groups.map((group) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formattedGroups = groups.map((group: any) => ({
       ...group,
       _id: group.id,
       user: group.userEmail,

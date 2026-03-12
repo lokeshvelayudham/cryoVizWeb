@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
       where: { datasetId: dataset }
     });
 
-    const files: ListFile[] = docs.map((doc) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const files: ListFile[] = docs.map((doc: any) => ({
       id: doc.id,
       name: doc.name,
       tag: doc.format,

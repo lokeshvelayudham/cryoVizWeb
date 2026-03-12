@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     const views = await prisma.view.findMany({ where: { datasetId } });
     
     // Restore raw map to frontend expectations
-    const formattedViews = views.map(v => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formattedViews = views.map((v: any) => ({
       ...v,
       _id: v.id,
       coords: v.coords ? JSON.parse(v.coords) : null,

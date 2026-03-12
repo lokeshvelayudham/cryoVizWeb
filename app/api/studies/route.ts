@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    const safeStudies = studies.map((s) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const safeStudies = studies.map((s: any) => ({
       _id: s.id,
       ...s,
     }));

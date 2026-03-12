@@ -81,7 +81,8 @@ export async function getInstitutions(): Promise<Institution[]> {
   try {
     return await getOrSetCache('institutions_all', async () => {
       const institutions = await prisma.institution.findMany();
-      return institutions.map(inst => ({ ...inst, _id: inst.id }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return institutions.map((inst: any) => ({ ...inst, _id: inst.id }));
     });
   } catch (error) {
     throw new Error(`Failed to fetch institutions: ${error}`);
@@ -97,10 +98,12 @@ export async function getUsers(): Promise<User[]> {
       const users = await prisma.user.findMany({
         include: { assignedDatasets: true }
       });
-      return users.map(user => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return users.map((user: any) => ({
         ...user,
         _id: user.id,
-        assignedDatasets: user.assignedDatasets.map(d => d.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        assignedDatasets: user.assignedDatasets.map((d: any) => d.id)
       }));
     });
   } catch (error) {
@@ -117,10 +120,12 @@ export async function getDatasets(): Promise<Dataset[]> {
       const datasets = await prisma.dataset.findMany({
         include: { assignedUsers: true }
       });
-      return datasets.map(dataset => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return datasets.map((dataset: any) => ({
         ...dataset,
         _id: dataset.id,
-        assignedUsers: dataset.assignedUsers.map(u => u.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        assignedUsers: dataset.assignedUsers.map((u: any) => u.id)
       }));
     });
   } catch (error) {
@@ -354,10 +359,12 @@ export async function getDatasetMappings(): Promise<DatasetMapping[]> {
     const mappings = await prisma.datasetMapping.findMany({
       include: { children: true }
     });
-    return mappings.map(m => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return mappings.map((m: any) => ({
       ...m,
       _id: m.id,
-      children: m.children.map(c => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      children: m.children.map((c: any) => ({
         datasetId: c.datasetId,
         alias: c.alias,
         order: c.order
@@ -376,7 +383,8 @@ export async function getDatasetMappingByParent(parentId: string) {
     return {
       ...mapping,
       _id: mapping.id,
-      children: mapping.children.map(c => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      children: mapping.children.map((c: any) => ({
         datasetId: c.datasetId,
         alias: c.alias,
         order: c.order
@@ -393,7 +401,8 @@ export async function createDatasetMapping(mapping: Omit<DatasetMapping, "_id" |
     data: {
       parentId: mapping.parentId,
       children: {
-        create: mapping.children.map(c => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        create: mapping.children.map((c: any) => ({
           datasetId: c.datasetId,
           alias: c.alias,
           order: c.order || 0
@@ -415,7 +424,8 @@ export async function updateDatasetMapping(id: string, patch: Partial<DatasetMap
       data: {
         children: {
           deleteMany: {}, // Clear existing
-          create: patch.children.map(c => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          create: patch.children.map((c: any) => ({
             datasetId: c.datasetId,
             alias: c.alias,
             order: c.order || 0

@@ -61,7 +61,8 @@ export async function createNotificationsForUsers(userIds: string[], notificatio
 
     // Create notifications for each user
     const result = await prisma.notification.createMany({
-      data: users.map(user => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: users.map((user: any) => ({
         userId: user.id,
         type: notificationData.type,
         title: notificationData.title,

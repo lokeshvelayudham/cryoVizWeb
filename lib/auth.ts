@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/prisma";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { updateUserLastLogin } from "@/lib/models";
 
 // Extend the built-in session types
 declare module "next-auth" {
@@ -47,6 +48,9 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({ where: { email: credentials.email } });
         
         if (!user) return null;
+
+        // Update login tracking metadata
+        await updateUserLastLogin(user.id);
 
         // Clean up OTP after successful use
         await prisma.otp.deleteMany({ where: { email: credentials.email } });
